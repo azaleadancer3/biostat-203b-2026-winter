@@ -1,2 +1,10 @@
-sample solution
-some bug
+---
+title: "Biostat 203B Homework 1"
+author: "Azalea Morris, UID: 505619664"
+format: html
+execute:
+  echo: true
+---
+```{r}
+sessionInfo()
+```
