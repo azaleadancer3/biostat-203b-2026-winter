@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 1"
-subtitle: Due ~~Jan 23~~ Jan 25, 2026 @ 11:59PM
-author: Your Name and UID
+subtitle: Due ~~Jan 23~~ Jan 25, 2026 @ 11:59PM (Medical Extension)
+author: Azalea Morris, UID: 505619664
 format:
   html:
     theme: cosmo
