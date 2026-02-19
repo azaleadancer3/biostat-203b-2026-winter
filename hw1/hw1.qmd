@@ -149,12 +149,27 @@ zcat < ~/mimic/hosp/admissions.csv.gz \
 # admission_location counts:
 # Stream compressed admissions file without decompressing it using zcat.
 # Skip header row so column names are not counted as values using tail -n +2.
-# Extract the admission_location column (6th column) using awk.
+# Extract the admission_location column (8th column) using awk.
 # Count occurrences of each admission location using sort uniq -c.
 # Sorts the results by frequency in decreasing order using sort -nr
 zcat < ~/mimic/hosp/admissions.csv.gz \
 | tail -n +2 \
 | awk -F',' '{print $8}' \
+| sort \
+| uniq -c \
+| sort -nr
+
+```
+```{bash}
+# insurance counts:
+# Stream compressed admissions file without decompressing it using zcat.
+# Skip header row so column names are not counted as values using tail -n +2.
+# Extract the insurance column (10th column) using awk.
+# Count occurrences of each admission location using sort uniq -c.
+# Sorts the results by frequency in decreasing order using sort -nr
+zcat < ~/mimic/hosp/admissions.csv.gz \
+| tail -n +2 \
+| awk -F',' '{print $10}' \
 | sort \
 | uniq -c \
 | sort -nr
