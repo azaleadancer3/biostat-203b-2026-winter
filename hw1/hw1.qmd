@@ -104,6 +104,30 @@ Each hadm_id represents a unique hospitalization, and since there are 546,028 ro
 
 How many unique patients (identified by `subject_id`) are in this data file? Do they match the number of patients listed in the `patients.csv.gz` file? (Hint: combine Linux commands `zcat <`, `head`/`tail`, `awk`, `sort`, `uniq`, `wc`, and so on.)
 
+```{bash}
+# Stream the compressed admissions file without decompressing it.
+# Remove the header line to avoid counting column names as data.
+# Extract the subject_id column (first column) using awk.
+# Sort and remove duplicates, then count unique patients.
+
+zcat < ~/mimic/hosp/admissions.csv.gz \
+| tail -n +2 \
+| awk -F',' '{print $1}' \
+| sort \
+| uniq \
+| wc -l
+```
+
+```{bash}
+# Stream the compressed patients file.
+# Skip the header row.
+# Count the total number of rows, which corresponds to total patients.
+
+zcat < ~/mimic/hosp/patients.csv.gz \
+| tail -n +2 \
+| wc -l
+```
+The number of unique patients identified by subject_id in admissions.csv.gz is 223,452, whereas the patients.csv.gz file contains 364,627 patients. These values do not match because the patients table includes all patients in the dataset, while the admissions table contains only those who had hospital admissions.
 
 6. What are the possible values taken by each of the variable `admission_type`, `admission_location`, `insurance`, and `ethnicity`? Also report the count for each unique value of these variables in decreasing order. (Hint: combine Linux commands `zcat`, `head`/`tail`, `awk`, `uniq -c`, `wc`, `sort`, and so on; skip the header line.)
 
