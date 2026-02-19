@@ -130,7 +130,36 @@ zcat < ~/mimic/hosp/patients.csv.gz \
 The number of unique patients identified by subject_id in admissions.csv.gz is 223,452, whereas the patients.csv.gz file contains 364,627 patients. These values do not match because the patients table includes all patients in the dataset, while the admissions table contains only those who had hospital admissions.
 
 6. What are the possible values taken by each of the variable `admission_type`, `admission_location`, `insurance`, and `ethnicity`? Also report the count for each unique value of these variables in decreasing order. (Hint: combine Linux commands `zcat`, `head`/`tail`, `awk`, `uniq -c`, `wc`, `sort`, and so on; skip the header line.)
+```{bash}
+# admission_type counts:
+# Stream compressed admissions file without decompressing it using zcat.
+# Skip header row so column names are not counted as values using tail -n +2.
+# Extract the admission_type column (6th column) using awk.
+# Count occurrences of each admission type using sort uniq -c.
+# Sorts the results by frequency in decreasing order using sort -nr
+zcat < ~/mimic/hosp/admissions.csv.gz \
+| tail -n +2 \
+| awk -F',' '{print $6}' \
+| sort \
+| uniq -c \
+| sort -nr
 
+```
+```{bash}
+# admission_location counts:
+# Stream compressed admissions file without decompressing it using zcat.
+# Skip header row so column names are not counted as values using tail -n +2.
+# Extract the admission_location column (6th column) using awk.
+# Count occurrences of each admission location using sort uniq -c.
+# Sorts the results by frequency in decreasing order using sort -nr
+zcat < ~/mimic/hosp/admissions.csv.gz \
+| tail -n +2 \
+| awk -F',' '{print $8}' \
+| sort \
+| uniq -c \
+| sort -nr
+
+```
 7. The `icusays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?
 
 8. _To compress, or not to compress. That's the question._ Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
