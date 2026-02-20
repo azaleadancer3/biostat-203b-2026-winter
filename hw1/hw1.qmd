@@ -214,7 +214,35 @@ zcat < ~/mimic/icu/icustays.csv.gz \
 | wc -l
 ```
 
-8. _To compress, or not to compress. That's the question._ Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
+8. _To compress, or not to compress. That's the question._ Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. 
+```{bash}
+# Check the size of the compressed file:
+ls -lh ~/mimic/hosp/labevents.csv.gz
+```
+```{bash}
+# Create the uncompressed file (temporarily):
+gzip -dk < ~/mimic/hosp/labevents.csv.gz > ./labevents.csv
+```
+
+```{bash}
+# Check the size of the uncompressed file:
+ls -lh labevents.csv
+```
+
+Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. 
+```{bash}
+# Check the run time of compressed version:
+time zcat < ~/mimic/hosp/labevents.csv.gz | wc -l
+```
+```{bash}
+# Check the run time of uncompressed version:
+time wc -l labevents.csv
+```
+Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
+```{bash}
+rm labevents.csv
+```
+The compressed file labevents.csv.gz is significantly smaller (occupies significantly less disk space) than the uncompressed file labevents.csv, demonstrating the storage efficiency of gzip compression. However, when it comes to speed, the uncompressed version is much faster to process with wc -l compared to the compressed version using zcat. This is because decompressing the file on-the-fly with zcat adds overhead, especially for large files. The trade-off between storage and speed for big data files is that while compression saves disk space and can reduce transfer times, it can also slow down data processing due to the need for decompression. For large datasets, it may be more efficient to keep files compressed and use tools that can read compressed files directly, rather than decompressing them first.Streaming compressed files with zcat reduces storage requirements and is often preferred for large datasets, while working with uncompressed files can improve processing speed at the cost of increased disk usage. This illustrates the trade-off between storage efficiency and computational performance when working with big data.
 
 ## Q4. Who's popular in Pride and Prejudice
 
