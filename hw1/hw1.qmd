@@ -175,6 +175,22 @@ zcat < ~/mimic/hosp/admissions.csv.gz \
 | sort -nr
 
 ```
+```{bash}
+# ethnicity counts:
+# Stream compressed admissions file without decompressing it using zcat.
+# Skip header row so column names are not counted as values using tail -n +2.
+# Extract the ethnicity column (13th column) using awk.
+# Count occurrences of each admission location using sort uniq -c.
+# Sorts the results by frequency in decreasing order using sort -nr
+zcat < ~/mimic/hosp/admissions.csv.gz \
+| tail -n +2 \
+| awk -F',' '{print $13}' \
+| sort \
+| uniq -c \
+| sort -nr
+
+```
+
 7. The `icusays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?
 
 8. _To compress, or not to compress. That's the question._ Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
