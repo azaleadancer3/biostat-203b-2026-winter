@@ -262,10 +262,20 @@ wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 for char in Elizabeth Jane Lydia Darcy
 do
   echo $char:
-  # some bash commands here
+  grep -i "$char" pg42671.txt | wc -l
 done
 ```
 
+Results:
+Elizabeth:
+     633
+Jane:
+     289
+Lydia:
+     167
+Darcy:
+     415
+     
 2. What's the difference between the following two commands?
 ```{bash}
 #| eval: false
