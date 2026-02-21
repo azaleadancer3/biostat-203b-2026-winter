@@ -251,7 +251,11 @@ The compressed file labevents.csv.gz is significantly smaller (occupies signific
 #| eval: false
 wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 ```
-Explain what `wget -nc` does. Do **not** put this text file `pg42671.txt` in Git. Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.
+Explain what `wget -nc` does. Do **not** put this text file `pg42671.txt` in Git.
+
+The command wget is a utility for downloading files from the web. The -nc option stands for "no clobber," which means that if the file already exists in the current directory, wget will not download it again and will skip the download. This prevents overwriting an existing file with the same name, which is useful to avoid unnecessary downloads and to preserve any existing data. In this case, if pg42671.txt already exists in the local folder, running wget -nc will simply skip the download and keep the existing file intact.
+
+Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.
 ```{bash}
 #| eval: false
 wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
