@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 1"
 subtitle: Due ~~Jan 23~~ Jan 25, 2026 @ 11:59PM (Medical Extension)
-author: Azalea Morris, UID: 505619664
+author: "Azalea Morris, UID: 505619664"
 format:
   html:
     theme: cosmo
@@ -477,14 +477,11 @@ The output that Copilot predicts is incorrect.
 Example 5:
 Question 6:
 
-Question I asked the AI assistant:
+Copilot suggested using an absolute file path.
 
-Copilot suggested using an absolute file path:
-![](/Users/azalea/Desktop/section_4.1.5.png)
 Issue:
 Using an absolute path works only on my computer. When the homework is rendered on another machine (grader’s environment or GitHub), the image will not load because that file path does not exist there.
 
 Correction:
-The image should be placed inside the homework repository and referenced with a relative path:
-![](images/section_4.1.5.png)
+The image should be placed inside the homework repository and referenced with a relative path.
 
