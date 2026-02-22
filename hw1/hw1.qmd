@@ -287,6 +287,8 @@ and
 echo 'hello, world' >> test2.txt
 ```
 
+The > operator redirects output to a file and overwrites the file if it already exists, replacing any previous content. In contrast, the >> operator redirects output by appending it to the end of a file, preserving the existing contents.
+
 3. Using your favorite text editor (e.g., `vi`), type the following and save the file as `middle.sh`:
 ```{bash eval=FALSE}
 #!/bin/sh
