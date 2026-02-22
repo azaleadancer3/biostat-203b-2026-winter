@@ -303,6 +303,11 @@ Using `chmod` to make the file executable by the owner, and run
 ```
 Explain the output. Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script. Why do we need the first line of the shell script?
 
+The output of the command ./middle.sh pg42671.txt 20 5 will display lines 16 to 20 of the file pg42671.txt. The script uses head to select the first 20 lines of the file and then tail to select the last 5 lines from that selection, effectively giving us lines 16-20.
+In the shell script, "$1", "$2", and "$3" are positional parameters that represent the arguments passed to the script when it is executed. "$1" refers to the first argument (filename), "$2" refers to the second argument (end_line), and "$3" refers to the third argument (num_lines). These parameters allow the script to be flexible and reusable with different inputs.
+The first line of the shell script, #!/bin/sh, is called a shebang.
+It specifies the interpreter that should be used to execute the script. In this case, it indicates that the script should be run using the Bourne shell (sh). This line is important because it ensures that the script is executed with the correct shell, which can affect how the commands within the script are interpreted and executed.
+
 ## Q5. More fun with Linux
 
 Try following commands in Bash and interpret the results: `cal`, `cal 2026`, `cal 9 1752` (anything unusual?), `date`, `hostname`, `arch`, `uname -a`, `uptime`, `who am i`, `who`, `w`, `id`, `last | head`, `echo {con,pre}{sent,fer}{s,ed}`, `time sleep 5`, `history | tail`.
