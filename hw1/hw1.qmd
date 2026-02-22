@@ -312,6 +312,103 @@ It specifies the interpreter that should be used to execute the script. In this 
 
 Try following commands in Bash and interpret the results: `cal`, `cal 2026`, `cal 9 1752` (anything unusual?), `date`, `hostname`, `arch`, `uname -a`, `uptime`, `who am i`, `who`, `w`, `id`, `last | head`, `echo {con,pre}{sent,fer}{s,ed}`, `time sleep 5`, `history | tail`.
 
+```{bash}
+cal
+```
+Interpretation: 
+The cal command displays a calendar for the current month and year. It shows the days of the week and the dates in a grid format, allowing users to quickly reference the calendar for the current month.
+
+```{bash}
+cal 2026
+```
+Interpretation:
+The command cal 2026 displays the calendar for the entire year of 2026. It
+shows all 12 months of the year in a grid format, allowing users to reference the calendar for any month in 2026.
+
+```{bash}
+cal 9 1752
+```
+Interpretation:
+September 1752 appears unusual because several dates are missing. This reflects the historical switch from the Julian to the Gregorian calendar, during which days were skipped to correct the calendar.
+
+```{bash}
+date
+```
+Interpretation:
+The date command displays the current date and time according to the system's clock. It provides information such as the day of the week, month, day of the month, time, timezone, and year. This command is useful for quickly checking the current date and time on the system.
+
+```{bash}
+hostname
+```
+Interpretation:
+The hostname command displays the name of the current machine or computer. It shows the network name assigned to the system, which can be useful for identifying the machine in a networked environment or when working
+
+```{bash}
+arch
+```
+Interpretation:
+The arch command displays the architecture of the machine's processor. It indicates whether the system is running on a 32-bit or 64-bit architecture, which can be important for compatibility with software and understanding the capabilities of the hardware.
+
+```{bash}
+uname -a
+```
+Interpretation:
+The uname -a command provides detailed information about the system, including the kernel name, hostname, kernel release, kernel version, machine hardware name, processor type, hardware platform, and operating system.
+
+```{bash}
+uptime
+```
+Interpretation:
+The uptime command shows how long the system has been running since the last boot, along with the current time, number of users currently logged in, and the system load averages for the past 1 minute, 5 minutes, and 15 minutes. This information is useful for monitoring system performance and understanding how long the system has been active.
+
+```{bash}
+who am i
+```
+Interpretation:
+The who am i command displays the username of the current user who is logged in and running the command. It shows the user's login name, terminal, date and time of login, and the host from which the user is logged in. This command is useful for confirming the identity of the user and their login session details.
+
+```{bash}
+who
+```
+Interpretation:
+The who command displays a list of all users currently logged into the system, along with their login names, terminal, date and time of login, and the host from which they are logged in.
+
+```{bash}
+w
+```
+Interpretation:
+The w command provides a more detailed view of the currently logged-in users and their activities. It shows the username, terminal, login time, idle time, JCPU (time used by all processes attached to the terminal), PCPU (time used by the current process), and the command being executed by each user. This command is useful for monitoring user activity and system usage in real-time.
+
+```{bash}
+id
+```
+Interpretation:
+The id command displays the user ID (UID), group ID (GID), and the groups that the current user belongs to. It provides information about the user's identity and group memberships, which can be important for understanding permissions and access control on the system.
+
+```{bash}
+last | head
+```
+Interpretation:
+The last command shows a list of the most recent login sessions on the system, including the username of the user, the terminal they logged in from, the date and time of login, and the duration of the session. By piping it to head, we can see only the first few entries, which gives us a quick overview of recent login activity.
+```{bash}
+echo {con,pre}{sent,fer}{s,ed}
+```
+Interpretation:
+The echo command with the brace expansion {con,pre}{sent,fer}{s,ed } generates a list of combinations of the specified strings. It generates this combination: consents consented confers confered presents presented prefers prefered. It demonstrates shell expansion without loops.
+
+```{bash}
+time sleep 5
+```
+Interpretation:
+The time command is used to measure the duration of a command's execution. In this case, it measures how long the sleep 5 command takes to execute. The sleep command simply pauses the execution for a specified number of seconds, which is 5 seconds in this case. The output will show the real time (total elapsed time), user CPU time, and system CPU time taken to execute the sleep command.
+
+```{bash}
+history | tail
+```
+
+Interpretation:
+The history command displays a list of previously executed commands in the current shell session. By piping it to tail, we can see only the last few entries, which gives us a quick overview of the most recent commands that were run in the terminal. When executed inside a Quarto Bash chunk, the history may be empty because the chunk runs in a new non-interactive shell session.
+
 ## Q6. Book
 
 1. Git clone the repository <https://github.com/christophergandrud/Rep-Res-Book> for the book _Reproducible Research with R and RStudio_ to your local machine. Do **not** put this repository within your homework repository `biostat-203b-2026-winter`.
