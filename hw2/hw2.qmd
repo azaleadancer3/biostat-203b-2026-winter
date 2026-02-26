@@ -171,12 +171,6 @@ The memory usage also decreased compared to Q1.1 because numeric identifiers wer
 
 ## Q2. Ingest big data files
 
-<p align="center">
-
-<img src="./bigfile.png" width="50%"/>
-
-</p>
-
 Let us focus on a bigger file, `labevents.csv.gz`, which is about 130x bigger than `admissions.csv.gz`.
 
 ```{bash}
@@ -191,13 +185,14 @@ zcat < ~/mimic/hosp/labevents.csv.gz | head -10
 
 ### Q2.1 Ingest `labevents.csv.gz` by `read_csv`
 
-<p align="center">
-
-<img src="./readr_logo.png" width="20%"/>
-
-</p>
-
 Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes more than 3 minutes on your computer, then abort the program and report your findings.
+
+```{r}
+#| eval: false
+readr::read_csv("~/mimic/hosp/labevents.csv.gz")
+```
+
+When attempting to ingest `labevents.csv.gz` using `read_csv`, the program takes an excessively long time to complete (over 3 minutes) and consumes a large amount of memory, which may lead to system instability or crashes. This is likely due to the large size of the file (approximately 130 times larger than `admissions.csv.gz`) and the overhead associated with parsing such a large dataset in memory. The default behavior of `read_csv` is not optimized for handling files of this magnitude, which results in inefficient processing and resource usage.
 
 ### Q2.2 Ingest selected columns of `labevents.csv.gz` by `read_csv`
 
