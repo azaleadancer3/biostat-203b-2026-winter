@@ -125,6 +125,50 @@ Thus, fread() not only ran the fastest but also produced the most memory-efficie
 
 Re-ingest `admissions.csv.gz` by indicating appropriate column data types in `read_csv`. Does the run time change? How much memory does the result tibble use? (Hint: `col_types` argument in `read_csv`; result tibble should be less than 50MB.)
 
+```{r}
+library(readr)
+library(lobstr)   # use this instead of pryr (works on your R version)
+
+file <- "~/mimic/hosp/admissions.csv.gz"
+
+system.time({
+  admissions_tibble2 <- read_csv(
+    file,
+    col_types = cols(
+      subject_id = col_integer(),
+      hadm_id = col_integer(),
+      admittime = col_datetime(),
+      dischtime = col_datetime(),
+      deathtime = col_datetime(),
+      admission_type = col_character(),
+      admit_provider_id = col_character(),
+      admission_location = col_character(),
+      discharge_location = col_character(),
+      insurance = col_character(),
+      language = col_character(),
+      marital_status = col_character(),
+      race = col_character(),
+      edregtime = col_datetime(),
+      edouttime = col_datetime(),
+      hospital_expire_flag = col_integer()
+    )
+  )
+})
+
+lobstr::obj_size(admissions_tibble2)
+str(admissions_tibble2)
+```
+Specifying column types using the `col_types` argument slightly reduced the run time compared to the default `read_csv`, because the parser no longer needs to guess data types.
+
+Default `read_csv()` elapsed time: 0.502 seconds  
+Typed `read_csv()` elapsed time: 0.362 seconds  
+
+This represents an improvement of about 0.14 seconds (~28% faster). The speedup occurs because `read_csv()` no longer needs to infer column types by scanning the data, which reduces parsing overhead.
+
+The memory usage of the resulting tibble is about 63 MB, which is smaller than the base R result but similar to the default `read_csv` ingestion. Explicitly defining integer and datetime columns ensures consistent data types and avoids unnecessary conversions during parsing.
+
+The memory usage also decreased compared to Q1.1 because numeric identifiers were explicitly parsed as integers rather than doubles.
+
 ## Q2. Ingest big data files
 
 <p align="center">
