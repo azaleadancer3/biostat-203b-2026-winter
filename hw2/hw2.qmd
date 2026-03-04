@@ -1,6 +1,6 @@
 ---
 title: "Biostat 203B Homework 2"
-subtitle: Due (Medical Extension) ~~Feb 8~~ Feb 11, 2026 @ 11:59PM
+subtitle: Due (Medical Extension) 
 author: "Your Name and UID"
 format:
   html:
@@ -456,3 +456,25 @@ Because chartevents.csv.gz contains more than 400 million rows, directly reading
 Which AI assistants (e.g., GitHub Copilot) do you use when working on this assignment? Which AI model (e.g., GPT-5 mini, GPT-5, Claude Sonnet 4.5) does the AI assistant use? How do you use them? Do you think they help improve your productivity?
 
 Give 5 instances where AI model gave incorrect or misleading answers. You can use screenshots or copy-paste the Q&A.
+
+For this assignment I used Github Copilot which uses the GPT-5 model. I used it by writing pseudocode or posing prompts and using the AI's code completion and text completion functions. Overall, the AI assistant improved my productivity because it helped quickly clarify errors and concepts that would otherwise require searching documentation or multiple web sources. However, the AI occasionally produced some incorrect or misleading answers, so I still needed to verify outputs and compare them with the assignment instructions.
+
+Mistake 1: 
+Incorrect column indexing in awk command:
+The AI initially suggested filtering the chartevents.csv.gz file using itemid in column 6. However, the correct column for itemid in the file is 7. This would have produced incorrect filtering results.
+
+Mistake 2:
+Incorrect assumption about Arrow speed:
+The AI initially suggested that Apache Arrow would be faster than the Bash-filtered dataset. In practice, Arrow took around 46 seconds because it had to scan the entire CSV file, while the Bash-filtered dataset was much smaller and loaded in about 4 seconds.
+
+Mistake 3:
+Confusing explanation about header counting:
+The AI explanation about row counting initially made it unclear whether read_csv() counted the header row. I needed to verify that read_csv() automatically treats the first row as column names and does not include it in the row count.
+
+Mistake 4:
+Incorrect assumption about Parquet file size:
+The AI initially suggested that Parquet files would likely be smaller than the original CSV file. However, when I generated the dataset, the Parquet directory was approximately 2.6 GB, similar to the CSV file size, which showed that compression gains can vary depending on the dataset.
+
+Mistake 5:
+Suggestion to run heavy commands unnecessarily:
+The AI suggested running commands such as counting all rows in chartevents.csv.gz. This operation takes a long time because the file contains over 433 million rows, and the assignment instructions already provided the row count. Running the command was therefore unnecessary.
