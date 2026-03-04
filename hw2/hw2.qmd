@@ -363,6 +363,35 @@ Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](ht
 
 Write a few sentences to explain what DuckDB is. Imagine you want to explain it to a layman in an elevator.
 
+```{r}
+library(arrow)
+library(dplyr)
+library(duckdb)
+
+system.time({
+  labevents_duckdb <- open_dataset("labevents_parquet") |>
+    to_duckdb() |>
+    filter(itemid %in% c(
+      50862, 50912, 50971, 50983,
+      50902, 50882, 51221, 51301,
+      50931
+    )) |>
+    select(subject_id, itemid, charttime, valuenum) |>
+    collect()
+})
+```
+```{r}
+nrow(labevents_duckdb)
+```
+
+```{r}
+head(labevents_duckdb, 10)
+```
+
+Using DuckDB, the ingest, conversion, selection, and filtering process took 3.098 seconds. The resulting dataset contains 33,712,352 rows, which matches the number of rows obtained in Q2.3, Q2.4, and Q2.5. The first 10 rows of the result also match those obtained previously, confirming that the filtering was performed correctly. DuckDB efficiently queries the Parquet dataset using a database engine without loading the entire dataset into memory.
+
+DuckDB Elevator Explanation: DuckDB is an SQL database engine designed for fast data analysis. It allows you to run SQL queries on large datasets inside programs like R or Python without needing a separate database server. You can think of it as a powerful spreadsheet that can handle much larger datasets and complex queries efficiently, all within your R environment. It can efficiently query large datasets stored in files such as Parquet without loading all the data into memory. It’s great for data analysis because it can quickly filter and aggregate data without loading everything into memory at once. In simple terms, DuckDB acts like a very fast built-in database that helps analyze large datasets quickly.
+
 ## Q3. Ingest and filter `chartevents.csv.gz`
 
 [`chartevents.csv.gz`](https://mimic.mit.edu/docs/iv/modules/icu/chartevents/) contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The `itemid` variable indicates a single measurement type in the database. The `value` variable is the value measured for `itemid`. The first 10 lines of `chartevents.csv.gz` are
