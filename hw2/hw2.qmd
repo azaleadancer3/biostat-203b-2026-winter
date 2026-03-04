@@ -412,10 +412,44 @@ zcat < ~/mimic/icu/chartevents.csv.gz | tail -n +2 | wc -l
 ```{bash}
 zcat < ~/mimic/icu/d_items.csv.gz | head -10
 ```
-
 In later exercises, we are interested in the vitals for ICU patients: heart rate (220045), mean non-invasive blood pressure (220181), systolic non-invasive blood pressure (220179), body temperature in Fahrenheit (223761), and respiratory rate (220210). Retrieve a subset of `chartevents.csv.gz` only containing these items, using the favorite method you learnt in Q2.
 
 Document the steps and show code. Display the number of rows and the first 10 rows of the result tibble.
+
+```{bash}
+#| eval: false
+
+zcat < ~/mimic/icu/chartevents.csv.gz | \
+awk -F',' 'NR==1 {print "subject_id,itemid,charttime,valuenum"} 
+NR>1 && ($6==220045 || $6==220181 || $6==220179 || $6==223761 || $6==220210) 
+{print $1","$6","$5","$9}' | \
+gzip > chartevents_filtered.csv.gz
+```
+
+```{bash}
+zcat < chartevents_filtered.csv.gz | head -10
+```
+```{bash}
+zcat < chartevents_filtered.csv.gz | tail -n +2 | wc -l
+```
+
+```{r}
+library(readr)
+
+system.time({
+  chartevents_filtered <- read_csv("chartevents_filtered.csv.gz")
+})
+```
+
+```{r}
+nrow(chartevents_filtered)
+```
+
+```{r}
+head(chartevents_filtered, 10)
+```
+
+Because chartevents.csv.gz contains more than 400 million rows, directly reading the entire dataset into R would be slow and memory-intensive. Therefore, I first filtered the dataset using a Bash pipeline (zcat and awk) to retain only the five vital measurement itemids of interest and only the necessary columns (subject_id, itemid, charttime, and valuenum). The filtered dataset was saved as chartevents_filtered.csv.gz, which is much smaller and faster to load into R for analysis.
 
 ## Q4. AI assistant
 
