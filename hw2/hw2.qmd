@@ -304,25 +304,61 @@ Using Apache Arrow, the ingest, select, and filter process took 46.30 seconds. T
 Apache Arrow Elevator Explanation: Apache Arrow is a columnar data format and computing framework designed for high-performance data analytics. It allows large datasets to be processed efficiently by reading data in chunks and performing operations like filtering and column selection without loading the entire dataset into memory. This makes it possible to analyze datasets that are larger than available RAM while maintaining fast performance.
 
 ### Q2.5 Compress `labevents.csv` to Parquet format and ingest/select/filter
-
-<p align="center">
-
-<img src="./parquet_logo.png" width="30%"/>
-
-</p>
-
 Re-write the csv file `labevents.csv` in the binary Parquet format (Hint: [`arrow::write_dataset`](https://arrow.apache.org/docs/r/reference/write_dataset.html).) How large is the Parquet file(s)? How long does the ingest+select+filter process of the Parquet file(s) take? Display the number of rows and the first 10 rows of the result tibble and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
 
 Write a few sentences to explain what the Parquet format is. Imagine you want to explain it to a layman in an elevator.
 
+```{r}
+#| eval: false
+
+library(arrow)
+
+dataset <- open_dataset("labevents.csv", format = "csv")
+
+write_dataset(
+  dataset,
+  "labevents_parquet",
+  format = "parquet"
+)
+```
+
+bash code block
+```{bash}
+du -sh labevents_parquet
+```
+
+```{r}
+library(arrow)
+library(dplyr)
+
+system.time({
+
+labevents_parquet <- open_dataset("labevents_parquet") |>
+  filter(itemid %in% c(
+    50862, 50912, 50971, 50983,
+    50902, 50882, 51221, 51301,
+    50931
+  )) |>
+  select(subject_id, itemid, charttime, valuenum) |>
+  collect()
+
+})
+```
+
+```{r}
+nrow(labevents_parquet)
+```
+
+```{r}
+head(labevents_parquet, 10)
+```
+
+The Parquet dataset occupies 2.6 GB on disk. Using Apache Arrow to ingest, filter, and select columns from the Parquet dataset took 2.67 seconds. The resulting tibble contains 33,712,352 rows, which matches the filtered dataset obtained in Q2.3. The first 10 rows of the result also match those obtained previously, confirming that the filtering was applied correctly. Compared with reading the CSV file directly (~46 seconds using Arrow), the Parquet format allows much faster queries because the data is stored in a columnar binary format optimized for analytical workloads.
+
+Parquet Elevator Explanation: 
+Parquet is a file format designed to store large datasets efficiently. Unlike CSV files, which store data as plain text row by row, Parquet stores data column by column in a compressed format. This allows programs to read only the columns they need instead of scanning the entire dataset, which makes data analysis much faster. In simple terms, Parquet is a more compact and efficient way to store large datasets so they can be processed quickly.
+
 ### Q2.6 DuckDB
-
-<p align="center">
-
-<img src="./duckdb_logo.png" width="20%"/>
-
-</p>
-
 Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](https://arrow.apache.org/docs/r/reference/to_duckdb.html), select columns, and filter rows as in Q2.5. How long does the ingest+convert+select+filter process take? Display the number of rows and the first 10 rows of the result tibble and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
 
 Write a few sentences to explain what DuckDB is. Imagine you want to explain it to a layman in an elevator.
