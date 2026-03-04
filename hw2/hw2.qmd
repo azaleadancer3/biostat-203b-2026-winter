@@ -258,17 +258,50 @@ This demonstrates that pre-filtering the data at the system level substantially 
 
 ### Q2.4 Ingest `labevents.csv` by Apache Arrow
 
-<p align="center">
-
-<img src="./arrow_logo.png" width="30%"/>
-
-</p>
-
 Our second strategy is to use [Apache Arrow](https://arrow.apache.org/) for larger-than-memory data analytics. Unfortunately Arrow does not work with gz files directly. First decompress `labevents.csv.gz` to `labevents.csv` and put it in the current working directory (do not add it in Git!). To save render time, put `#| eval: false` at the beginning of this code chunk. TA will change it to `#| eval: true` when rendering your qmd file.
 
 Then use [`arrow::open_dataset`](https://arrow.apache.org/docs/r/reference/open_dataset.html) to ingest `labevents.csv`, select columns, and filter `itemid` as in Q2.3. How long does the ingest+select+filter process take? Display the number of rows and the first 10 rows of the result tibble, and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
 
 Write a few sentences to explain what Apache Arrow is. Imagine you want to explain it to a layman in an elevator.
+
+```{bash}
+#| eval: false
+
+gunzip -c ~/mimic/hosp/labevents.csv.gz > labevents.csv
+```
+
+```{r}
+library(arrow)
+library(dplyr)
+
+system.time({
+
+labevents_arrow <- open_dataset(
+  "labevents.csv",
+  format = "csv"
+) |>
+  filter(itemid %in% c(
+    50862, 50912, 50971, 50983,
+    50902, 50882, 51221, 51301,
+    50931
+  )) |>
+  select(subject_id, itemid, charttime, valuenum) |>
+  collect()
+
+})
+```
+
+```{r}
+nrow(labevents_arrow)
+```
+
+```{r}
+head(labevents_arrow, 10)
+```
+
+Using Apache Arrow, the ingest, select, and filter process took 46.30 seconds. The resulting dataset contains 33,712,352 rows, which matches the number of rows obtained in Q2.3 after filtering the dataset using Bash. The first 10 rows of the result also match those produced previously, confirming that the filtering was applied correctly. Although this approach takes longer than reading the pre-filtered dataset, Apache Arrow allows efficient processing of large datasets by scanning and filtering data without loading the entire dataset into memory.
+
+Apache Arrow Elevator Explanation: Apache Arrow is a columnar data format and computing framework designed for high-performance data analytics. It allows large datasets to be processed efficiently by reading data in chunks and performing operations like filtering and column selection without loading the entire dataset into memory. This makes it possible to analyze datasets that are larger than available RAM while maintaining fast performance.
 
 ### Q2.5 Compress `labevents.csv` to Parquet format and ingest/select/filter
 
