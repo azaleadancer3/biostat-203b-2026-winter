@@ -222,7 +222,39 @@ Our first strategy to handle this big data file is to make a subset of the `labe
 
 In later exercises, we will only be interested in the following lab items: albumin (50862), creatinine (50912), potassium (50971), sodium (50983), chloride (50902), bicarbonate (50882), hematocrit (51221), white blood cell count (51301), and glucose (50931) and the following columns: `subject_id`, `itemid`, `charttime`, `valuenum`. Write a Bash command to extract these columns and rows from `labevents.csv.gz` and save the result to a new file `labevents_filtered.csv.gz` in the current working directory. (Hint: Use `zcat <` to pipe the output of `labevents.csv.gz` to `awk` and then to `gzip` to compress the output. Do **not** put `labevents_filtered.csv.gz` in Git! To save render time, you can put `#| eval: false` at the beginning of this code chunk. TA will change it to `#| eval: true` before rendering your qmd file.)
 
+```{bash}
+
+zcat < ~/mimic/hosp/labevents.csv.gz | \
+awk -F',' '
+NR==1 {
+  print "subject_id,itemid,charttime,valuenum"
+}
+NR>1 && ($5=="50862" || $5=="50912" || $5=="50971" || $5=="50983" || \
+         $5=="50902" || $5=="50882" || $5=="51221" || $5=="51301" || \
+         $5=="50931") {
+  print $2","$5","$7","$10
+}' | gzip > labevents_filtered.csv.gz
+```
+
 Display the first 10 lines of the new file `labevents_filtered.csv.gz`. How many lines are in this new file, excluding the header? How long does it take `read_csv` to ingest `labevents_filtered.csv.gz`?
+
+```{bash}
+zcat < labevents_filtered.csv.gz | head -10
+```
+
+```{r}
+library(readr)
+
+system.time({
+  labevents_filtered <- read_csv("labevents_filtered.csv.gz")
+})
+```
+
+After filtering labevents.csv.gz to include only the nine lab items of interest and selecting the four columns subject_id, itemid, charttime, and valuenum, the resulting file contains 33,712,352 rows, excluding the header. 
+
+Reading the filtered file using read_csv() took 4.39 seconds, compared to over 117 seconds when reading the much larger unfiltered subset in Q2.2. The read_csv() function automatically treats the first line as column names (col_names = TRUE by default), so the reported number of rows from nrow() does not include the header.
+
+This demonstrates that pre-filtering the data at the system level substantially reduces both data size and ingestion time, making downstream analysis significantly more efficient.
 
 ### Q2.4 Ingest `labevents.csv` by Apache Arrow
 
