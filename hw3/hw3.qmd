@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 3"
-subtitle: "Due Feb 22 @ 11:59PM"
-author: "Your Name and UID"
+subtitle: "(Medical Extension)"
+author: "Azalea Morris, UID: 505619664"
 format:
   html:
     theme: cosmo
@@ -23,7 +23,6 @@ Load necessary libraries (you can add more as needed).
 library(arrow)
 library(gtsummary)
 library(memuse)
-library(pryr)
 library(R.utils)
 library(tidyverse)
 ```
@@ -47,6 +46,127 @@ A patient's ADT history records the time of admission, discharge, and transfer i
 Do a similar visualization for the patient with `subject_id` 10063848 using ggplot.
 
 Hint: We need to pull information from data files `patients.csv.gz`, `admissions.csv.gz`, `transfers.csv.gz`, `labevents.csv.gz`, `procedures_icd.csv.gz`, `diagnoses_icd.csv.gz`, `d_icd_procedures.csv.gz`, and `d_icd_diagnoses.csv.gz`. For the big file `labevents.csv.gz`, use the Parquet format you generated in Homework 2. For reproducibility, make the Parquet folder `labevents_pq` available at the current working directory `hw3`, for example, by a symbolic link. Make your code reproducible.
+
+```{r}
+patients_tble <- read_csv("~/mimic/hosp/patients.csv.gz", show_col_types = FALSE)
+admissions_tble <- read_csv("~/mimic/hosp/admissions.csv.gz", show_col_types = FALSE)
+transfers_tble <- read_csv("~/mimic/hosp/transfers.csv.gz", show_col_types = FALSE)
+procedures_tble <- read_csv("~/mimic/hosp/procedures_icd.csv.gz", show_col_types = FALSE)
+diagnoses_tble <- read_csv("~/mimic/hosp/diagnoses_icd.csv.gz", show_col_types = FALSE)
+d_icd_proc <- read_csv("~/mimic/hosp/d_icd_procedures.csv.gz", show_col_types = FALSE)
+d_icd_diag <- read_csv("~/mimic/hosp/d_icd_diagnoses.csv.gz", show_col_types = FALSE)
+```
+
+```{r}
+lab_pq <- open_dataset("labevents_parquet")
+```
+
+```{r}
+target_id <- 10063848
+```
+
+```{r}
+labs <- lab_pq %>%
+  filter(subject_id == target_id) %>%
+  collect()
+```
+
+```{r}
+adt <- transfers_tble %>%
+  filter(subject_id == target_id) %>%
+  mutate(
+    intime = ymd_hms(intime),
+    outtime = ymd_hms(outtime),
+    icu_flag = ifelse(str_detect(careunit, "ICU|CCU"), "ICU/CCU", "Ward"),
+    line_wt = as.numeric(ifelse(icu_flag == "ICU/CCU", 2, 1))
+  ) %>%
+  filter(
+    !is.na(intime),
+    !is.na(outtime),
+    outtime >= intime
+  )
+```
+
+```{r}
+proc <- procedures_tble %>%
+  filter(subject_id == target_id) %>%
+  left_join(d_icd_proc, by = c("icd_code", "icd_version")) %>%
+  left_join(
+    admissions_tble %>% select(hadm_id, admittime),
+    by = "hadm_id"
+  ) %>%
+  mutate(
+    admittime = lubridate::ymd_hms(admittime),
+    event_type = "Procedure"
+  )
+```
+
+```{r}
+diag_text <- diagnoses_tble %>%
+  filter(subject_id == target_id) %>%
+  left_join(d_icd_diag, by = c("icd_code", "icd_version")) %>%
+  count(long_title, sort = TRUE) %>%
+  slice_head(n = 3) %>%
+  pull(long_title) %>%
+  paste(collapse = "; ")
+```
+
+```{r}
+title_text <- patients_tble %>%
+  filter(subject_id == target_id) %>%
+  mutate(label = paste0(
+    "Patient ", subject_id,
+    " | Gender: ", gender,
+    " | Age: ", anchor_age
+  )) %>%
+  pull(label)
+```
+
+```{r}
+ggplot() +
+  geom_segment(
+    data = adt,
+    aes(
+      x = intime,
+      xend = outtime,
+      y = "ADT",
+      yend = "ADT",
+      color = careunit,
+      linewidth = line_wt
+    ),
+    show.legend = FALSE
+  ) +
+  geom_point(
+    data = labs,
+    aes(
+      x = charttime,
+      y = "Lab"
+    ),
+    shape = 3,
+    size = 1
+  ) +
+  geom_point(
+    data = proc,
+    aes(
+      x = admittime,
+      y = "Procedure"
+    ),
+    shape = 16,
+    size = 2
+  ) +
+  labs(
+    title = title_text,
+    subtitle = str_wrap(diag_text, width = 45),
+    x = "Calendar Time",
+    y = NULL
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 12),
+    plot.subtitle = element_text(size = 9)
+  )
+```
 
 ### Q1.2 ICU stays
 
