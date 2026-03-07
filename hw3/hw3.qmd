@@ -170,12 +170,88 @@ ggplot() +
 
 ### Q1.2 ICU stays
 
-ICU stays are a subset of ADT history. This figure shows the vitals of the patient `10001217` during ICU stays. The x-axis is the calendar time, and the y-axis is the value of the vital. The color of the line represents the type of vital. The facet grid shows the abbreviation of the vital and the stay ID.
+ICU stays are a subset of ADT history. This figure shows the vitals of the patient `10001217` during ICU stays. The x-axis is the calendar time, and the y-axis is the value of the vital. The color of the line represents the type of vital. The facet grid shows the abbreviation of the vital and the stay ID. 
 
 ![](10001217_icu.png)
 
 Do a similar visualization for the patient `10063848`.
 
+```{r}
+library(arrow)
+
+chart_ds <- open_dataset(
+  "~/mimic/icu/chartevents.csv.gz",
+  format = "csv"
+)
+```
+
+```{r}
+write_dataset(
+  chart_ds,
+  "hw3/chartevents_parquet",
+  format = "parquet"
+)
+```
+
+```{r}
+list.files("hw3")
+```
+
+```{r}
+chartevents_pq <- open_dataset("hw3/chartevents_parquet")
+```
+
+```{r}
+icu_stays <- read_csv("~/mimic/icu/icustays.csv.gz", show_col_types = FALSE) %>%
+  filter(subject_id == 10063848) %>%
+  mutate(
+    intime = ymd_hms(intime),
+    outtime = ymd_hms(outtime)
+  )
+```
+
+```{r}
+vitals <- chartevents_pq %>%
+  filter(
+    subject_id == 10063848,
+    itemid %in% c(220045, 220179, 220180, 223761, 220210)
+  ) %>%
+  collect() %>%
+  mutate(charttime = suppressWarnings(ymd_hms(charttime))) %>%
+  filter(!is.na(charttime)) %>%
+  inner_join(
+    icu_stays %>% select(stay_id, intime, outtime),
+    by = "stay_id"
+  ) %>%
+  filter(charttime >= intime, charttime <= outtime) %>%
+  mutate(
+    vital_name = case_when(
+      itemid == 220045 ~ "Heart Rate",
+      itemid == 220179 ~ "Systolic BP",
+      itemid == 220180 ~ "Diastolic BP",
+      itemid == 223761 ~ "Body Temp (F)",
+      itemid == 220210 ~ "Respiratory Rate"
+    )
+  )
+```
+
+```{r}
+ggplot(vitals, aes(x = charttime, y = valuenum, color = vital_name)) +
+  geom_line() +
+  geom_point(size = 0.5) +
+  facet_grid(vital_name ~ stay_id, scales = "free_y", switch = "y") +
+  labs(
+    title = "Patient 10063848 ICU stays - Vitals",
+    x = "Calendar Time",
+    y = "Value"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.text.y.left = element_text(angle = 0, size = 9),
+    strip.placement = "outside"
+  )
+```
 ## Q2. ICU stays
 
 `icustays.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/icu/icustays/>) contains data about Intensive Care Units (ICU) stays. The first 10 lines are
