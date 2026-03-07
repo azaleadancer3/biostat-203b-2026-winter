@@ -262,7 +262,15 @@ zcat < ~/mimic/icu/icustays.csv.gz | head
 ### Q2.1 Ingestion
 
 Import `icustays.csv.gz` as a tibble `icustays_tble`. 
+```{r}
+icustays_tble <- read_csv(
+  "~/mimic/icu/icustays.csv.gz",
+  show_col_types = FALSE
+)
 
+dim(icustays_tble)
+glimpse(icustays_tble)
+```
 ### Q2.2 Summary and visualization
 
 How many unique `subject_id`? Can a `subject_id` have multiple ICU stays? Summarize the number of ICU stays per `subject_id` by graphs. 
