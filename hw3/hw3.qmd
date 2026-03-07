@@ -275,6 +275,36 @@ glimpse(icustays_tble)
 
 How many unique `subject_id`? Can a `subject_id` have multiple ICU stays? Summarize the number of ICU stays per `subject_id` by graphs. 
 
+```{r}
+# number of unique subject_id
+n_distinct(icustays_tble$subject_id)
+```
+
+```{r}
+# number of ICU stays per subject_id
+icu_counts <- icustays_tble %>%
+  count(subject_id, name = "n_icu_stays")
+```
+
+```{r}
+# top 10 subjects with more than 1 ICU stay
+icu_counts %>%
+  filter(n_icu_stays > 1) %>%
+  slice_head(n = 10)
+```
+
+```{r}
+ggplot(icu_counts, aes(x = n_icu_stays)) +
+  geom_bar() +
+  labs(
+    title = "Number of ICU stays per subject",
+    x = "ICU stays per subject",
+    y = "Count of subjects"
+  ) +
+  theme_bw()
+```
+There are many unique patients in the ICU dataset, and some patients have multiple ICU stays. Most subjects have only one ICU stay, while progressively fewer subjects have repeated ICU admissions.
+
 ## Q3. `admissions` data
 
 Information of the patients admitted into hospital is available in `admissions.csv.gz`. See <https://mimic.mit.edu/docs/iv/modules/hosp/admissions/> for details of each field in this file. The first 10 lines are
@@ -286,6 +316,14 @@ zcat < ~/mimic/hosp/admissions.csv.gz | head
 
 Import `admissions.csv.gz` as a tibble `admissions_tble`.
 
+```{r}
+admissions_tble <- read_csv(
+  "~/mimic/hosp/admissions.csv.gz",
+  show_col_types = FALSE
+)
+
+glimpse(admissions_tble)
+```
 ### Q3.2 Summary and visualization
 
 Summarize the following information by graphics and explain any patterns you see.
@@ -299,6 +337,74 @@ According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/co
 
 > All dates in the database have been shifted to protect patient confidentiality. Dates will be internally consistent for the same patient, but randomly distributed in the future. Dates of birth which occur in the present time are not true dates of birth. Furthermore, dates of birth which occur before the year 1900 occur if the patient is older than 89. In these cases, the patient’s age at their first admission has been fixed to 300.
 
+
+```{r}
+admissions_tble <- admissions_tble %>%
+  mutate(
+    admittime = suppressWarnings(ymd_hms(admittime)),
+    dischtime = suppressWarnings(ymd_hms(dischtime))
+  ) %>%
+  filter(!is.na(admittime), !is.na(dischtime)) %>%
+  mutate(
+    admit_hour = hour(admittime),
+    admit_minute = minute(admittime),
+    los_days = as.numeric(dischtime - admittime, units = "days")
+  )
+```
+
+```{r}
+admit_counts <- admissions_tble %>%
+  count(subject_id, name = "n_admissions")
+
+ggplot(admit_counts, aes(x = n_admissions)) +
+  geom_bar() +
+  coord_cartesian(xlim = c(1, 10)) +
+  labs(
+    title = "Number of admissions per patient",
+    x = "Admissions per patient",
+    y = "Count of patients"
+  ) +
+  theme_bw()
+```
+Most patients have only one hospital admission, while fewer patients have repeated admissions. The amount of patients decreases as the number of admissions increases.
+
+```{r}
+ggplot(admissions_tble, aes(x = admit_hour)) +
+  geom_bar() +
+  labs(
+    title = "Admission hour",
+    x = "Hour of day",
+    y = "Count"
+  ) +
+  theme_bw()
+```
+Admissions are not uniformly distributed across the day. Counts are lowest during early morning hours and increase substantially during the late afternoon and evening, which likely reflects hospital workflow, scheduled transfers, and emergency department admission patterns. There is a noticeable spike around 7 AM which may reflect hospital workflow rather than true biological timing, since shift changes and scheduled processing of admissions often occur in the early morning.
+
+```{r}
+ggplot(admissions_tble, aes(x = admit_minute)) +
+  geom_bar() +
+  labs(
+    title = "Admission minute",
+    x = "Minute",
+    y = "Count"
+  ) +
+  theme_bw()
+```
+Admission minutes are not uniformly distributed. There are clear spikes at 0, 15, 30, and 45 minutes, suggesting that admission times are often rounded to quarter-hour intervals or recorded using standardized timestamp conventions in the hospital system.
+
+```{r}
+ggplot(admissions_tble, aes(x = los_days)) +
+  geom_histogram(bins = 50) +
+  coord_cartesian(xlim = c(0, 50)) +
+  labs(
+    title = "Length of hospital stay",
+    x = "Length of stay (days)",
+    y = "Count"
+  ) +
+  theme_bw()
+```
+Length of hospital stay is strongly right-skewed. Most admissions are short, but a small number of patients remain hospitalized for much longer periods, which may reflect severe illness, complications, or prolonged recovery.
+
 ## Q4. `patients` data
 
 Patient information is available in `patients.csv.gz`. See <https://mimic.mit.edu/docs/iv/modules/hosp/patients/> for details of each field in this file. The first 10 lines are
@@ -309,10 +415,41 @@ zcat < ~/mimic/hosp/patients.csv.gz | head
 ### Q4.1 Ingestion
 
 Import `patients.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/hosp/patients/>) as a tibble `patients_tble`.
+```{r}
+patients_tble <- read_csv(
+  "~/mimic/hosp/patients.csv.gz",
+  show_col_types = FALSE
+)
 
+glimpse(patients_tble)
+```
 ### Q4.2 Summary and visualization
 
 Summarize variables `gender` and `anchor_age` by graphics, and explain any patterns you see.
+
+```{r}
+ggplot(patients_tble, aes(x = gender)) +
+  geom_bar() +
+  labs(
+    title = "Patient gender distribution",
+    x = "Gender",
+    y = "Count"
+  ) +
+  theme_bw()
+```
+The gender distribution shows a slightly higher Female count, by about 25,000 patients, which may reflect the underlying population demographics or hospital admission patterns. 
+
+```{r}
+ggplot(patients_tble, aes(x = anchor_age)) +
+  geom_histogram(bins = 50) +
+  labs(
+    title = "Anchor age distribution",
+    x = "Anchor age",
+    y = "Count"
+  ) +
+  theme_bw()
+```
+Anchor age is concentrated among adult patients, with relatively fewer very old patients. The sawtooth pattern across neighboring ages suggests that anchor ages are affected by the MIMIC-IV de-identification process, which introduces artificial structure into the age distribution.
 
 ## Q5. Lab results
 
