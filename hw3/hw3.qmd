@@ -569,6 +569,83 @@ We are interested in the vitals for ICU patients: heart rate (220045), systolic 
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `chartevents_pq` folder available at the current working directory, for example, by a symbolic link.
 
+```{r}
+chartevents_pq <- open_dataset("hw3/chartevents_parquet")
+```
+
+```{r}
+vital_ids <- c(
+  220045, 220179, 220180,
+  223761, 220210
+)
+```
+
+```{r}
+icu_vitals <- icustays_tble %>%
+  select(subject_id, stay_id, intime, outtime)
+```
+
+```{r}
+icu_subjects <- unique(icustays_tble$subject_id)
+```
+
+```{r}
+vitals_long <- chartevents_pq %>%
+  select(subject_id, stay_id, itemid, charttime, storetime, valuenum) %>%
+  filter(
+    itemid %in% vital_ids,
+    subject_id %in% icu_subjects
+  ) %>%
+  collect() %>%
+  mutate(
+    charttime = suppressWarnings(ymd_hms(charttime)),
+    storetime = suppressWarnings(ymd_hms(storetime))
+  )
+```
+
+```{r}
+vitals_joined <- vitals_long %>%
+  inner_join(
+    icu_vitals,
+    by = c("subject_id", "stay_id"),
+    relationship = "many-to-many"
+  ) %>%
+  filter(storetime >= intime, storetime <= outtime)
+```
+
+```{r}
+vitals_first <- vitals_joined %>%
+  group_by(stay_id, itemid) %>%
+  slice_min(storetime, n = 1, with_ties = FALSE) %>%
+  ungroup()
+```
+
+```{r}
+vitals_first <- vitals_first %>%
+  mutate(
+    vital_name = case_when(
+      itemid == 220045 ~ "heart_rate",
+      itemid == 220179 ~ "sbp",
+      itemid == 220180 ~ "dbp",
+      itemid == 223761 ~ "temp_f",
+      itemid == 220210 ~ "resp_rate"
+    )
+  )
+```
+
+```{r}
+chartevents_tble <- vitals_first %>%
+  select(stay_id, vital_name, valuenum) %>%
+  pivot_wider(
+    names_from = vital_name,
+    values_from = valuenum
+  )
+```
+
+```{r}
+glimpse(chartevents_tble)
+head(chartevents_tble)
+```
 ## Q7. Putting things together
 
 Let us create a tibble `mimic_icu_cohort` for all ICU stays, where rows are all ICU stays of adults (age at `intime` >= 18) and columns contain at least following variables
