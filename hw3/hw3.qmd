@@ -646,6 +646,7 @@ chartevents_tble <- vitals_first %>%
 glimpse(chartevents_tble)
 head(chartevents_tble)
 ```
+
 ## Q7. Putting things together
 
 Let us create a tibble `mimic_icu_cohort` for all ICU stays, where rows are all ICU stays of adults (age at `intime` >= 18) and columns contain at least following variables
@@ -659,6 +660,24 @@ Let us create a tibble `mimic_icu_cohort` for all ICU stays, where rows are all 
 The final `mimic_icu_cohort` should have one row per ICU stay and columns for each variable.
 
 ![](mimic_icu_cohort.png)
+```{r}
+mimic_icu_cohort <- icustays_tble %>%
+  left_join(admissions_tble, by = c("subject_id", "hadm_id")) %>%
+  left_join(patients_tble, by = "subject_id") %>%
+  left_join(labevents_tble, by = "stay_id") %>%
+  left_join(chartevents_tble, by = "stay_id") %>%
+  filter(anchor_age >= 18)
+```
+
+```{r}
+nrow(mimic_icu_cohort)
+n_distinct(mimic_icu_cohort$stay_id)
+```
+
+```{r}
+glimpse(mimic_icu_cohort)
+head(mimic_icu_cohort)
+```
 
 ## Q8. Exploratory data analysis (EDA)
 
