@@ -470,6 +470,87 @@ We are interested in the lab measurements of albumin (50862), creatinine (50912)
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `labevents_pq` folder available at the current working directory `hw3`, for example, by a symbolic link.
 
+```{r}
+lab_pq <- open_dataset("labevents_parquet")
+```
+
+```{r}
+lab_ids <- c(
+  50862, 50912, 50971, 50983,
+  50902, 50882, 51221, 51301, 50931
+)
+```
+
+```{r}
+icu_lab <- icustays_tble %>%
+  select(subject_id, stay_id, intime)
+```
+
+```{r}
+icu_subjects <- unique(icustays_tble$subject_id)
+```
+
+```{r}
+labs_long <- lab_pq %>%
+  select(subject_id, itemid, charttime, storetime, valuenum) %>%
+  filter(
+    itemid %in% lab_ids,
+    subject_id %in% icu_subjects
+  ) %>%
+  collect() %>%
+  mutate(
+    charttime = suppressWarnings(ymd_hms(charttime)),
+    storetime = suppressWarnings(ymd_hms(storetime))
+  )
+```
+
+```{r}
+labs_joined <- labs_long %>%
+  inner_join(
+    icu_lab,
+    by = "subject_id",
+    relationship = "many-to-many"
+  ) %>%
+  filter(storetime <= intime)
+```
+
+```{r}
+labs_last <- labs_joined %>%
+  group_by(stay_id, itemid) %>%
+  slice_max(storetime, n = 1, with_ties = FALSE) %>%
+  ungroup()
+```
+
+```{r}
+labs_last <- labs_last %>%
+  mutate(
+    lab_name = case_when(
+      itemid == 50862 ~ "albumin",
+      itemid == 50912 ~ "creatinine",
+      itemid == 50971 ~ "potassium",
+      itemid == 50983 ~ "sodium",
+      itemid == 50902 ~ "chloride",
+      itemid == 50882 ~ "bicarbonate",
+      itemid == 51221 ~ "hematocrit",
+      itemid == 51301 ~ "wbc",
+      itemid == 50931 ~ "glucose"
+    )
+  )
+```
+
+```{r}
+labevents_tble <- labs_last %>%
+  select(stay_id, lab_name, valuenum) %>%
+  pivot_wider(
+    names_from = lab_name,
+    values_from = valuenum
+  )
+```
+
+```{r}
+glimpse(labevents_tble)
+head(labevents_tble)
+```
 ## Q6. Vitals from charted events
 
 `chartevents.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/icu/chartevents/>) contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The `itemid` variable indicates a single measurement type in the database. The `value` variable is the value measured for `itemid`. The first 10 lines of `chartevents.csv.gz` are
