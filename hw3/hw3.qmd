@@ -691,6 +691,311 @@ Summarize the following information about the ICU stay cohort `mimic_icu_cohort`
 
 - Length of ICU stay `los` vs first ICU unit
 
+
+Length of ICU stay `los` vs demographic variables (race, insurance, marital_status, gender, age at intime):
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(los)) %>%
+  ggplot(aes(x = gender, y = los)) +
+  geom_boxplot() +
+  labs(
+    title = "Length of ICU stay by gender",
+    x = "Gender",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+
+```{r}
+mimic_icu_cohort %>%
+  mutate(race = fct_lump_n(race, n = 8)) %>%
+  ggplot(aes(x = race, y = los)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    title = "Length of ICU stay by race",
+    x = "Race",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+ggplot(mimic_icu_cohort, aes(x = insurance, y = los)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    title = "Length of ICU stay by insurance",
+    x = "Insurance",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+ggplot(mimic_icu_cohort, aes(x = marital_status, y = los)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    title = "Length of ICU stay by marital status",
+    x = "Marital status",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(los), !is.na(anchor_age)) %>%
+  ggplot(aes(x = anchor_age, y = los)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth() +
+  labs(
+    title = "Length of ICU stay vs age",
+    x = "Age",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+
+Length of ICU stay `los` vs the last available lab measurements before ICU stay:
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(wbc), !is.na(los)) %>%
+  ggplot(aes(x = wbc, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(0, 40), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs WBC",
+    x = "White blood cell count",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(creatinine), !is.na(los)) %>%
+  ggplot(aes(x = creatinine, y = los)) +
+  geom_point(alpha = 0.2) +
+  coord_cartesian(xlim = c(0, 30), ylim = c(0, 90)) +
+  labs(
+    title = "Length of ICU stay vs creatinine",
+    x = "Creatinine",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(glucose), !is.na(los)) %>%
+  ggplot(aes(x = glucose, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(0, 300), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs glucose",
+    x = "Glucose",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(sodium), !is.na(los)) %>%
+  ggplot(aes(x = sodium, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(110, 160), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs sodium",
+    x = "Sodium",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(potassium), !is.na(los)) %>%
+  ggplot(aes(x = potassium, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(2, 8), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs potassium",
+    x = "Potassium",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(albumin), !is.na(los)) %>%
+  ggplot(aes(x = albumin, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(1, 5), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs albumin",
+    x = "Albumin",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(chloride), !is.na(los)) %>%
+  ggplot(aes(x = chloride, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(80, 130), ylim = c(0, 30)) +
+  labs(
+    title = "Length of ICU stay vs chloride",
+    x = "Chloride",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(chloride), !is.na(los)) %>%
+  ggplot(aes(x = chloride, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(80, 130), ylim = c(0, 30)) +
+  labs(
+    title = "Length of ICU stay vs chloride",
+    x = "Chloride",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(bicarbonate), !is.na(los)) %>%
+  ggplot(aes(x = bicarbonate, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(5, 45), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs bicarbonate",
+    x = "Bicarbonate",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(hematocrit), !is.na(los)) %>%
+  ggplot(aes(x = hematocrit, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(15, 55), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs hematocrit",
+    x = "Hematocrit",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+
+```{r}
+labs_long_plot <- mimic_icu_cohort %>%
+  select(
+    los,
+    albumin,
+    creatinine,
+    potassium,
+    sodium,
+    chloride,
+    bicarbonate,
+    hematocrit,
+    wbc,
+    glucose
+  ) %>%
+  pivot_longer(
+    cols = -los,
+    names_to = "lab",
+    values_to = "value"
+  )
+```
+
+```{r}
+ggplot(labs_long_plot, aes(x = value, y = los)) +
+  geom_point(alpha = 0.05) +
+  facet_wrap(~ lab, scales = "free_x") +
+  coord_cartesian(ylim = c(0, 20)) +
+  labs(
+    title = "Length of ICU stay vs last available lab measurements",
+    x = "Lab value",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+Length of ICU stay `los` vs the first vital measurements within the ICU stay:
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(heart_rate), !is.na(los)) %>%
+  ggplot(aes(x = heart_rate, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(30, 180), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs heart rate",
+    x = "Heart rate",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(sbp), !is.na(los)) %>%
+  ggplot(aes(x = sbp, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(50, 220), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs systolic blood pressure",
+    x = "SBP",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(dbp), !is.na(los)) %>%
+  ggplot(aes(x = dbp, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(20, 120), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs diastolic blood pressure",
+    x = "DBP",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(resp_rate), !is.na(los)) %>%
+  ggplot(aes(x = resp_rate, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(5, 50), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs respiratory rate",
+    x = "Respiratory rate",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+```{r}
+mimic_icu_cohort %>%
+  filter(!is.na(temp_f), !is.na(los)) %>%
+  ggplot(aes(x = temp_f, y = los)) +
+  geom_point(alpha = 0.1) +
+  coord_cartesian(xlim = c(90, 105), ylim = c(0, 40)) +
+  labs(
+    title = "Length of ICU stay vs temperature",
+    x = "Temperature (°F)",
+    y = "Length of ICU stay (days)"
+  ) +
+  theme_bw()
+```
+Length of ICU stay `los` vs first ICU unit:
+```{r}
+mimic_icu_cohort %>%
+  ggplot(aes(x = reorder(first_careunit, los, median), y = los)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, 30)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 ## Q9. AI assistant
 
 Which AI assistants (e.g., GitHub Copilot) do you use when working on this assignment? Which AI model (e.g., GPT-5 mini, GPT-5, Claude Sonnet 4.5) does the AI assistant use? How do you use them? Do you think they help improve your productivity? 
