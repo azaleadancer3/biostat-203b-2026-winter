@@ -449,7 +449,7 @@ ggplot(patients_tble, aes(x = anchor_age)) +
   ) +
   theme_bw()
 ```
-Anchor age is concentrated among adult patients, with relatively fewer very old patients. The sawtooth pattern across neighboring ages suggests that anchor ages are affected by the MIMIC-IV de-identification process, which introduces artificial structure into the age distribution.
+Anchor age is concentrated among adult patients, with relatively fewer very old patients. The sawtooth pattern across neighboring ages suggests that anchor ages are affected by the MIMIC-IV de-identification process, which introduces artificial structure into the age distribution. In addition, patients older than 89 are top-coded at anchor_age = 91, which contributes to the visible accumulation at the upper end of the distribution.
 
 ## Q5. Lab results
 
@@ -1001,3 +1001,22 @@ mimic_icu_cohort %>%
 Which AI assistants (e.g., GitHub Copilot) do you use when working on this assignment? Which AI model (e.g., GPT-5 mini, GPT-5, Claude Sonnet 4.5) does the AI assistant use? How do you use them? Do you think they help improve your productivity? 
 
 Give 5 instances where AI model gave incorrect or misleading answers. You can use screenshots or copy-paste the Q&A.
+
+
+For this assignment, I used ChatGPT and GitHub Copilot as AI assistants.
+
+ChatGPT was used primarily for debugging R code, understanding warnings, improving ggplot visualizations, and checking whether my data wrangling logic matched the assignment requirements. The model used was GPT-5. GitHub Copilot was used inside RStudio to suggest code completions and generate dplyr or ggplot syntax based on nearby code context. The model was also GPT-5. 
+
+These tools improved productivity by reducing time spent searching documentation and by helping identify coding patterns more quickly. However, AI-generated code still required manual checking because suggested solutions were not always fully aligned with the assignment requirements or dataset structure.
+
+Five examples where AI gave incorrect or misleading answers:
+
+1. Copilot suggested joining ICU stays and chartevents without restricting measurements to ICU stay time windows, which would have included observations outside the ICU interval.
+
+2. ChatGPT initially suggested joining labevents_tble twice when constructing mimic_icu_cohort, which created duplicate columns such as bicarbonate.x and bicarbonate.y.
+
+3. Copilot suggested using d_items labels directly for vitals, but this did not guarantee selecting only the first measurement within each ICU stay.
+
+4. ChatGPT initially interpreted extreme creatinine values as needing removal, when using coord_cartesian was more appropriate because it preserves all data.
+
+5. Copilot suggested plotting all laboratory variables using identical x-axis limits, which made several lab plots unreadable because each lab has very different value ranges.
