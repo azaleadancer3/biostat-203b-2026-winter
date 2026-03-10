@@ -104,8 +104,9 @@ proc <- procedures_tble %>%
 ```{r}
 diag_text <- diagnoses_tble %>%
   filter(subject_id == target_id) %>%
+  arrange(seq_num) %>%
   left_join(d_icd_diag, by = c("icd_code", "icd_version")) %>%
-  count(long_title, sort = TRUE) %>%
+  distinct(long_title, .keep_all = TRUE) %>%
   slice_head(n = 3) %>%
   pull(long_title) %>%
   paste(collapse = "; ")
@@ -167,6 +168,7 @@ ggplot() +
     plot.subtitle = element_text(size = 9)
   )
 ```
+Two of the first three diagnoses map to the same ICD description (“Fistula of intestine”), so the subtitle showed a repeated diagnosis even though the entries come from different diagnosis records ordered by `seq_num`. This occurs because MIMIC diagnosis coding can contain multiple ICD codes or repeated entries that share the same clinical description. I used distinct(long_title, .keep_all = TRUE) after ordering by seq_num so that repeated diagnosis descriptions would not appear multiple times in the subtitle. This keeps the diagnoses in clinical order while ensuring the top 3 displayed diagnoses are unique and easier to interpret.
 
 ### Q1.2 ICU stays
 
@@ -746,7 +748,6 @@ mimic_icu_cohort %>%
   filter(!is.na(los), !is.na(anchor_age)) %>%
   ggplot(aes(x = anchor_age, y = los)) +
   geom_point(alpha = 0.2) +
-  geom_smooth() +
   labs(
     title = "Length of ICU stay vs age",
     x = "Age",
@@ -848,19 +849,7 @@ mimic_icu_cohort %>%
   ) +
   theme_bw()
 ```
-```{r}
-mimic_icu_cohort %>%
-  filter(!is.na(chloride), !is.na(los)) %>%
-  ggplot(aes(x = chloride, y = los)) +
-  geom_point(alpha = 0.1) +
-  coord_cartesian(xlim = c(80, 130), ylim = c(0, 30)) +
-  labs(
-    title = "Length of ICU stay vs chloride",
-    x = "Chloride",
-    y = "Length of ICU stay (days)"
-  ) +
-  theme_bw()
-```
+
 ```{r}
 mimic_icu_cohort %>%
   filter(!is.na(bicarbonate), !is.na(los)) %>%
