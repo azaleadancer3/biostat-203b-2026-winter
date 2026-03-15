@@ -39,7 +39,7 @@ ui <- fluidPage(
         )
       )
     ),
-    
+    # patient lookup uses cohort created from BigQuery-derived ICU data
     tabPanel(
       "Patient Lookup",
       
