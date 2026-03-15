@@ -198,6 +198,75 @@ Hint: Below is a numerical summary of my tibble after preprocessing:
 
 <iframe width=95% height="500" src="./mimic_icu_cohort_gtsummary.html"></iframe>
 
+```{r}
+mimic_icu_cohort <- mimic_icu_cohort |>
+  mutate(
+    first_careunit = fct_lump_n(
+      factor(first_careunit),
+      n = 5,
+      other_level = "Other"
+    ),
+    last_careunit = fct_lump_n(
+      factor(last_careunit),
+      n = 5,
+      other_level = "Other"
+    ),
+    admission_type = fct_lump_n(
+      factor(admission_type),
+      n = 5,
+      other_level = "Other"
+    ),
+    admission_location = fct_lump_n(
+      factor(admission_location),
+      n = 5,
+      other_level = "Other"
+    ),
+    discharge_location = fct_lump_n(
+      factor(discharge_location),
+      n = 5,
+      other_level = "Other"
+    ),
+    race = case_when(
+      str_detect(race, "ASIAN") ~ "ASIAN",
+      str_detect(race, "BLACK") ~ "BLACK",
+      str_detect(race, "HISPANIC") ~ "HISPANIC",
+      str_detect(race, "WHITE") ~ "WHITE",
+      TRUE ~ "Other"
+    ),
+    race = factor(race),
+    los_long = los >= 2
+  )
+
+mimic_icu_cohort |>
+  select(
+    first_careunit,
+    last_careunit,
+    admission_type,
+    admission_location,
+    discharge_location,
+    race,
+    gender,
+    anchor_age,
+    los,
+    creatinine,
+    hematocrit,
+    wbc,
+    albumin,
+    bicarbonate,
+    chloride,
+    glucose,
+    potassium,
+    sodium,
+    dbp,
+    heart_rate,
+    resp_rate,
+    sbp,
+    temp_f,
+    los_long
+  ) |>
+  tbl_summary(by = los_long)
+```
+
 ### Q1.9 Save the final tibble
 
 Save the final tibble to an R data file `mimic_icu_cohort.rds` in the `mimiciv_shiny` folder.
