@@ -297,3 +297,20 @@ Develop a Shiny app for exploring the ICU cohort data created in Q1. The app sho
 Which AI assistants (e.g., GitHub Copilot) do you use when working on this assignment? Which AI model (e.g., GPT-5 mini, GPT-5, Claude Sonnet 4.5) does the AI assistant use? How do you use them? Do you think they help improve your productivity? 
 
 Give 5 instances where AI model gave incorrect or misleading answers. You can use screenshots or copy-paste the Q&A.
+
+I used both ChatGPT and GitHub Copilot while working on this assignment. ChatGPT used GPT-5, and GitHub Copilot provided inline coding suggestions while writing R code. I used ChatGPT mainly for debugging R code, Git workflow, BigQuery queries, and Shiny app structure, while Copilot helped autocomplete repetitive syntax and suggest function arguments. Both tools improved my productivity by reducing time spent searching documentation and troubleshooting syntax errors.
+
+However, AI-generated answers were not always correct, and I had to verify outputs carefully. Below are five examples where AI gave incorrect or misleading answers:
+
+1. ChatGPT initially suggested joining a collected tibble with a remote BigQuery table in Q1.7, which caused a source mismatch error because both tables must share the same source before `collect()`.
+
+2. ChatGPT first suggested a `pivot_wider()` pipeline for labevents that produced duplicate-value warnings because repeated lab measurements needed summarization before pivoting.
+
+3. GitHub Copilot suggested preprocessing code that referenced variables before they were fully transformed, which caused execution errors.
+
+4. ChatGPT suggested a Shiny patient lookup version using BigQuery joins that repeatedly triggered parsing errors in my local R environment.
+
+5. GitHub Copilot suggested default table output settings that added unnecessary pagination controls for the patient lookup tab.
+
+Overall, AI tools were useful for speeding up coding and debugging, but all suggestions required manual checking against assignment instructions and actual output.
+
