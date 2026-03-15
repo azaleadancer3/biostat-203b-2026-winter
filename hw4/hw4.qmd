@@ -122,21 +122,54 @@ labevents_tble <- tbl(con_bq, "labevents") |>
     )
   ) |>
   select(stay_id, lab_name, valuenum) |>
-  distinct() |>
   collect() |>
+  group_by(stay_id, lab_name) |>
+  summarise(
+    valuenum = mean(valuenum, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   pivot_wider(
     names_from = lab_name,
     values_from = valuenum
   )
-
 ```
-
 ### Q1.6 `chartevents` data
 
 Connect to `chartevents` table and retrieve a subset that only contain subjects who appear in `icustays_tble` and the chart events listed in HW3. Only keep the first chart events (by `storetime`) during ICU stay and pivot chart events to become variables/columns. Write all steps in _one_ chain of pipes. Similary to HW3, if a vital has multiple measurements at the first `storetime`, average them.
 ```{r}
-# # TODO
-# chartevents_tble <- 
+chartevents_tble <- tbl(con_bq, "chartevents") |>
+  filter(itemid %in% c(
+    220045, 220179, 220180,
+    223761, 220210
+  )) |>
+  inner_join(
+    icustays_tble |>
+      select(subject_id, stay_id, intime, outtime),
+    by = c("subject_id", "stay_id")
+  ) |>
+  filter(storetime >= intime, storetime <= outtime) |>
+  group_by(stay_id, itemid) |>
+  filter(storetime == min(storetime, na.rm = TRUE)) |>
+  mutate(
+    vital_name = case_when(
+      itemid == 220045 ~ "heart_rate",
+      itemid == 220179 ~ "sbp",
+      itemid == 220180 ~ "dbp",
+      itemid == 223761 ~ "temp_f",
+      itemid == 220210 ~ "resp_rate"
+    )
+  ) |>
+  select(stay_id, vital_name, valuenum) |>
+  collect() |>
+  group_by(stay_id, vital_name) |>
+  summarise(
+    valuenum = mean(valuenum, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  pivot_wider(
+    names_from = vital_name,
+    values_from = valuenum
+  )
 ```
 
 ### Q1.7 Put things together
