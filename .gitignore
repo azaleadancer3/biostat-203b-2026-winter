@@ -57,3 +57,4 @@ labevents_filtered.csv.gz
 *.parquet
 .DS_Store
 hw1/.gitignore.save
+hw4/*.json
