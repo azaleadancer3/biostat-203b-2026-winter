@@ -15,7 +15,6 @@ format:
 
 
 ### Packages
-
 ```{r setup}
 library(arrow)
 library(gtsummary)
@@ -36,7 +35,6 @@ library(ggplot2)
 ```
 
 ### Token Set up and DB connection
-
 ```{r}
 # path to the service account token
 satoken <- "biostat-203b-2026-winter-92fefbfab477.json"
@@ -61,7 +59,6 @@ d_diagnosis <- tbl(con_bq, "d_icd_diagnoses")
 ```
 
 ### Cohort and Charlson Comorbidity Creation with Gender Statistics
-
 ```{r}
 micu_patients <- icu |>
   filter(first_careunit == "Medical Intensive Care Unit (MICU)") |>
@@ -156,7 +153,6 @@ print(female_summary)
 print(male_summary)
 ```
 ### Vital Sign Feature Extraction
-
 ```{r}
 # Pull first-24-hour vital signs recorded during the initial MICU stay
 vital_codes <- c(
@@ -208,4 +204,64 @@ vital_data_local <- vital_data_query |>
 
 micu_cohort_final <- micu_cohort_final |>
   left_join(vital_data_local, by = "stay_id")
+```
+
+### Laboratory Values Feature Extraction
+```{r}
+# Extract first-24-hour laboratory values from the initial MICU admission
+lab_codes <- c(
+  50813, # Lactate
+  50912, # Creatinine
+  51300, # WBC Count
+  50809, # Glucose
+  50983, # Sodium
+  50971, # Potassium
+  50902, # Chloride
+  50882, # Bicarbonate
+  51006, # Blood Urea Nitrogen
+  51222, # Hemoglobin
+  51221, # Hematocrit
+  51265 # Platelets
+)
+
+lab_data_query <- tbl(con_bq, "labevents") |>
+  filter(itemid %in% lab_codes) |>
+  inner_join(
+    micu_patients |> select(subject_id, hadm_id, stay_id, intime),
+    by = c("subject_id", "hadm_id")
+  ) |>
+  filter(charttime >= intime) |>
+  filter(charttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  mutate(
+    lab_name = case_when(
+      itemid == 50813 ~ "Lactate",
+      itemid == 50912 ~ "Creatinine",
+      itemid == 51300 ~ "WBC_Count",
+      itemid == 50809 ~ "Glucose",
+      itemid == 50983 ~ "Sodium",
+      itemid == 50971 ~ "Potassium",
+      itemid == 50902 ~ "Chloride",
+      itemid == 50882 ~ "Bicarbonate",
+      itemid == 51006 ~ "BUN",
+      itemid == 51222 ~ "Hemoglobin",
+      itemid == 51221 ~ "Hematocrit",
+      itemid == 51265 ~ "Platelets"
+    )
+  ) |>
+  group_by(stay_id, lab_name) |>
+  summarise(
+    mean_value = mean(valuenum, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+lab_data_local <- lab_data_query |>
+  collect() |>
+  pivot_wider(
+    names_from = lab_name,
+    values_from = mean_value,
+    names_glue = "{lab_name}_{.value}"
+  )
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(lab_data_local, by = "stay_id")
 ```
