@@ -34,3 +34,28 @@ library(doParallel)
 library(finetune)
 library(ggplot2)
 ```
+
+### Token Set up and DB connection
+
+```{r}
+# path to the service account token
+satoken <- "biostat-203b-2026-winter-92fefbfab477.json"
+# BigQuery authentication using service account
+bq_auth(path = satoken, cache = FALSE)
+
+con_bq <- dbConnect(
+  bigrquery::bigquery(),
+  project = "biostat-203b-2025-winter",
+  dataset = "mimiciv_3_1",
+  billing = "biostat-203b-2025-winter"
+)
+con_bq
+```
+
+```{r}
+# load BigQuery tables
+icu <- tbl(con_bq, "icustays")
+patients <- tbl(con_bq, "patients")
+diagnosis <- tbl(con_bq, "diagnoses_icd")
+d_diagnosis <- tbl(con_bq, "d_icd_diagnoses")
+```

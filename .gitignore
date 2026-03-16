@@ -58,3 +58,4 @@ labevents_filtered.csv.gz
 .DS_Store
 hw1/.gitignore.save
 hw4/*.json
+*.json
