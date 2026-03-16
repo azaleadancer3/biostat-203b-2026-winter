@@ -318,3 +318,27 @@ micu_cohort_final <- micu_cohort_final |>
     intubated = replace_na(intubated, 0)
   )
 ```
+### Urine Output Feature Extraction
+```{r}
+urine_query <- tbl(con_bq, "outputevents") |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  filter(charttime >= intime) |>
+  filter(charttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  group_by(stay_id) |>
+  summarise(urine_output_24h = sum(value, na.rm = TRUE), .groups = "drop")
+
+urine_local <- urine_query |> collect()
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(urine_local, by = "stay_id") |>
+  # Assume zero if no urine output was recorded
+  mutate(urine_output_24h = replace_na(urine_output_24h, 0))
+```
+
+```{r}
+glimpse(micu_cohort_final)
+write_rds(micu_cohort_final, "mimic_cohort_final.rds")
+```
