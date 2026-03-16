@@ -1,0 +1,36 @@
+---
+title: "Biostats 203B: Final Project"
+subtitle: "Predictors and 30-Day All-Cause Mortality Post MICU Hospitalization \nby Gender Using MIMIC-IV"
+author: "Azalea Morris, UID: 505619664"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: false
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+---
+
+
+### Packages
+
+```{r setup}
+library(arrow)
+library(gtsummary)
+library(R.utils)
+library(tidyverse)
+library(comorbidity)
+library(grDevices)
+library(tidymodels)
+library(FSelectorRcpp)
+library(bigrquery)
+library(GGally)
+library(ranger)
+library(xgboost)
+library(glmnet)
+library(doParallel)
+library(finetune)
+library(ggplot2)
+```
