@@ -342,3 +342,68 @@ micu_cohort_final <- micu_cohort_final |>
 glimpse(micu_cohort_final)
 write_rds(micu_cohort_final, "mimic_cohort_final.rds")
 ```
+
+### Missing Data Imputation and Feature Preparation
+```{r}
+# Prepare modeling dataset and handle missing values
+# Median imputation is applied to numeric predictors and mode imputation to factors
+ml_data <- micu_cohort_final |>
+  # Remove identifiers and variables not used for prediction
+  select(
+    -subject_id, -hadm_id, -stay_id,
+    -intime, -outtime, -dod, -days_death,
+    -los, -first_careunit, -last_careunit
+  ) |>
+  mutate(
+    mortality_30_days = factor(
+      mortality_30_days,
+      levels = c(0, 1),
+      labels = c("Survived", "Died")
+    ),
+    gender = as.factor(gender)
+  )
+
+set.seed(123) # Ensure reproducible train/test split
+data_split <- initial_split(
+  ml_data,
+  prop = 0.8,
+  strata = mortality_30_days
+)
+
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+temp_recipe <- recipe(mortality_30_days ~ ., data = train_data) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors())
+
+train_imputed_mi <- bake(prep(temp_recipe), new_data = NULL)
+
+mi_scores <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imputed_mi,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+top_features <- mi_scores |>
+  filter(importance > 0) |>
+  pull(attributes)
+
+impute_rec <- recipe(mortality_30_days ~ ., data = train_data) |>
+  step_select(mortality_30_days, all_of(top_features)) |>
+  # Median imputation for continuous predictors
+  step_impute_median(all_numeric_predictors()) |>
+  # Mode imputation for categorical predictors
+  step_impute_mode(all_nominal_predictors()) |>
+  # Convert categorical predictors into dummy variables
+  step_dummy(all_nominal_predictors()) |>
+  # Remove predictors with zero variance
+  step_zv(all_numeric_predictors()) |>
+  # Standardize numeric predictors
+  step_normalize(all_numeric_predictors())
+
+impute_prep <- prep(impute_rec)
+train_imputed <- bake(impute_prep, new_data = NULL)
+test_imputed <- bake(impute_prep, new_data = test_data)
+```
