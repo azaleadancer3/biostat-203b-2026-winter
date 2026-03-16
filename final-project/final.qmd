@@ -59,3 +59,75 @@ patients <- tbl(con_bq, "patients")
 diagnosis <- tbl(con_bq, "diagnoses_icd")
 d_diagnosis <- tbl(con_bq, "d_icd_diagnoses")
 ```
+
+### Cohort Creation and Comorbidity Creation with Gender Statistics
+
+```{r}
+micu_patients <- icu |>
+  filter(first_careunit == "Medical Intensive Care Unit (MICU)") |>
+  group_by(subject_id) |>
+  slice_min(order_by = intime, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  inner_join(patients, by = "subject_id") |>
+  filter(
+    anchor_age >= 18, # Restrict analysis to adult patients
+    !is.na(anchor_age), # Remove records with missing age
+    !is.na(gender) # Remove records with missing gender
+  ) |>
+  mutate(
+    days_death = sql("DATE_DIFF(CAST(dod AS DATE), CAST(intime AS DATE), DAY)"),
+    mortality_30_days = ifelse(!is.na(dod) & days_death <= 30, 1, 0)
+  )
+
+micu_patients_local <- micu_patients |> collect()
+
+diagnosis_subset <- diagnosis |>
+  semi_join(micu_patients, by = "hadm_id") |>
+  select(hadm_id, icd_code, icd_version) |>
+  collect()
+```
+
+```{r}
+icd9_subset <- diagnosis_subset |> filter(icd_version == 9)
+icd10_subset <- diagnosis_subset |> filter(icd_version == 10)
+
+cci_icd9 <- comorbidity(
+  x = icd9_subset,
+  id = "hadm_id",
+  code = "icd_code",
+  map = "charlson_icd9_quan",
+  assign0 = FALSE
+)
+
+cci_icd10 <- comorbidity(
+  x = icd10_subset,
+  id = "hadm_id",
+  code = "icd_code",
+  map = "charlson_icd10_quan",
+  assign0 = FALSE
+)
+
+cci_icd9$charlson_score <- score(
+  cci_icd9,
+  weights = "quan",
+  assign0 = FALSE
+)
+
+cci_icd10$charlson_score <- score(
+  cci_icd10,
+  weights = "quan",
+  assign0 = FALSE
+)
+
+# Merge ICD-9 and ICD-10 Charlson scores, keeping the highest per admission
+charlson_combined <- bind_rows(
+  cci_icd9 |> select(hadm_id, charlson_score),
+  cci_icd10 |> select(hadm_id, charlson_score)
+) |>
+  group_by(hadm_id) |>
+  summarise(charlson_score = max(charlson_score), .groups = "drop")
+
+micu_analysis <- micu_local |>
+  left_join(charlson_combined, by = "hadm_id") |>
+  mutate(charlson_score = replace_na(charlson_score, 0))
+```
