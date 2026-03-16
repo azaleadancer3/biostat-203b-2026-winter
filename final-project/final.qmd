@@ -432,3 +432,34 @@ summary_table_gender <- ml_data |>
 
 summary_table_gender
 ```
+### Mutual Information Ranking of Predictive Features
+
+```{r}
+# Recalculate mutual information after preprocessing
+# Higher values indicate stronger contribution to mortality prediction
+mi_scores <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imputed,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+# Plot the top 20 ranked predictors
+feature_importance_plot <- mi_scores |>
+  slice_head(n = 20) |>
+  ggplot(aes(x = reorder(attributes, importance), y = importance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Predictors by Mutual Information",
+    subtitle = "30-Day Mortality Prediction in MICU Patients",
+    x = "Predictor",
+    y = "Information Gain"
+  ) +
+  theme_minimal()
+
+# feature_importance_plot
+
+# Display ranked feature table
+head(mi_scores, max(nrow(mi_scores)))
+```
