@@ -432,8 +432,7 @@ summary_table_gender <- ml_data |>
 
 summary_table_gender
 ```
-### Mutual Information Ranking of Predictive Features
-
+### Mutual Information Scores Ranking of Predictive Features
 ```{r}
 # Recalculate mutual information after preprocessing
 # Higher values indicate stronger contribution to mortality prediction
@@ -462,4 +461,38 @@ feature_importance_plot <- mi_scores |>
 
 # Display ranked feature table
 head(mi_scores, max(nrow(mi_scores)))
+```
+
+### Predictive Models for the Full Cohort
+```{r}
+# Logistic regression model with elastic net tuning
+logit_mod <- logistic_reg(
+  penalty = tune(),
+  mixture = tune()
+) |>
+  set_engine("glmnet", standardize = FALSE) |>
+  print()
+
+# Random forest model
+rf_mod <-
+  rand_forest(
+    mode = "classification",
+    # Number of predictors sampled at each split
+    mtry = tune(),
+    # Number of trees included in the ensemble
+    trees = tune()
+  ) |>
+  set_engine("ranger")
+rf_mod
+
+# Gradient boosting model (XGBoost)
+gb_mod <-
+  boost_tree(
+    mode = "classification",
+    trees = 300,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_engine("xgboost")
+gb_mod
 ```
