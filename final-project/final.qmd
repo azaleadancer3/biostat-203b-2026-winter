@@ -265,3 +265,56 @@ lab_data_local <- lab_data_query |>
 micu_cohort_final <- micu_cohort_final |>
   left_join(lab_data_local, by = "stay_id")
 ```
+
+### Vasopressor Use and Intubation Features Extraction
+```{r}
+vasopressor_codes <- c(
+  221906, # Norepinephrine
+  221289, # Epinephrine
+  221749, # Phenylephrine
+  222315, # Vasopressin
+  221662 # Dopamine
+)
+
+intubation_codes <- c(
+  224385 # Intubation
+)
+
+input_events <- tbl(con_bq, "inputevents")
+procedure_events <- tbl(con_bq, "procedureevents")
+
+vasopressor_query <- input_events |>
+  filter(itemid %in% vasopressor_codes) |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  # Restrict medications to the first 24 hours after ICU admission
+  filter(starttime >= intime) |>
+  filter(starttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  group_by(stay_id) |>
+  summarise(vaso_active = 1, .groups = "drop")
+
+intubation_data_query <- procedure_events |>
+  filter(itemid %in% intubation_codes) |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  # Restrict procedures to the first 24 hours after ICU admission
+  filter(starttime >= intime) |>
+  filter(starttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  group_by(stay_id) |>
+  summarise(intubated = 1, .groups = "drop")
+
+vasopressor_local <- vasopressor_query |> collect()
+intubation_local <- intubation_data_query |> collect()
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(vasopressor_local, by = "stay_id") |>
+  left_join(intubation_local, by = "stay_id") |>
+  mutate(
+    vaso_active = replace_na(vaso_active, 0),
+    intubated = replace_na(intubated, 0)
+  )
+```
