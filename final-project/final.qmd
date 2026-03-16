@@ -391,7 +391,7 @@ top_features <- mi_scores |>
   pull(attributes)
 
 impute_rec <- recipe(mortality_30_days ~ ., data = train_data) |>
-  step_select(mortality_30_days, all_of(top_features)) |>
+  step_select(all_of(c("mortality_30_days", top_features))) |>
   # Median imputation for continuous predictors
   step_impute_median(all_numeric_predictors()) |>
   # Mode imputation for categorical predictors
@@ -404,6 +404,31 @@ impute_rec <- recipe(mortality_30_days ~ ., data = train_data) |>
   step_normalize(all_numeric_predictors())
 
 impute_prep <- prep(impute_rec)
+
 train_imputed <- bake(impute_prep, new_data = NULL)
 test_imputed <- bake(impute_prep, new_data = test_data)
+```
+
+### Cohort Summary Table 1 Stratified by Gender
+```{r}
+median_value <- stats::median
+q25 <- function(x) stats::quantile(x, probs = 0.25, na.rm = TRUE)
+q75 <- function(x) stats::quantile(x, probs = 0.75, na.rm = TRUE)
+
+summary_table_gender <- ml_data |>
+  tbl_summary(
+    by = gender,
+    statistic = list(
+      all_continuous() ~ "{median} ({q25}, {q75})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    missing_text = "Missing"
+  ) |>
+  add_overall() |>
+  add_p() |>
+  modify_spanning_header(c("stat_1", "stat_2") ~ "**Gender**") |>
+  modify_header(label = "**Clinical Characteristics**") |>
+  bold_labels()
+
+summary_table_gender
 ```
