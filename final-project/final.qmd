@@ -155,3 +155,57 @@ female_summary <- gender_summary |> filter(gender == "F")
 print(female_summary)
 print(male_summary)
 ```
+### Vital Sign Feature Extraction
+
+```{r}
+# Pull first-24-hour vital signs recorded during the initial MICU stay
+vital_codes <- c(
+  220045, # Heart rate
+  220210, # Respiratory rate
+  220277, # SpO2
+  223761, # Temperature Fahrenheit
+  220052, # Mean arterial pressure
+  220179, # Non-invasive systolic BP
+  220180, # Non-invasive diastolic BP
+  220181, # Non-invasive mean BP
+  226512 # Admission weight (kg)
+)
+
+vital_data_query <- tbl(con_bq, "chartevents") |>
+  filter(itemid %in% vital_codes) |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  filter(charttime >= intime) |>
+  filter(charttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  mutate(
+    vital_name = case_when(
+      itemid == 220045 ~ "HR",
+      itemid == 220210 ~ "RR",
+      itemid == 220277 ~ "SpO2",
+      itemid == 223761 ~ "Temp_F",
+      itemid == 220052 ~ "Arterial_BP_Mean",
+      itemid == 220179 ~ "NIBP_Systolic",
+      itemid == 220180 ~ "NIBP_Diastolic",
+      itemid == 220181 ~ "NIBP_Mean",
+      itemid == 226512 ~ "Weight_kg"
+    )
+  ) |>
+  group_by(stay_id, vital_name) |>
+  summarise(
+    mean_value = mean(valuenum, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+vital_data_local <- vital_data_query |>
+  collect() |>
+  pivot_wider(
+    names_from = vital_name,
+    values_from = mean_value,
+    names_glue = "{vital_name}_{.value}"
+  )
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(vital_data_local, by = "stay_id")
+```
