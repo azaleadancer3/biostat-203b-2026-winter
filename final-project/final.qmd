@@ -60,7 +60,7 @@ diagnosis <- tbl(con_bq, "diagnoses_icd")
 d_diagnosis <- tbl(con_bq, "d_icd_diagnoses")
 ```
 
-### Cohort Creation and Comorbidity Creation with Gender Statistics
+### Cohort and Charlson Comorbidity Creation with Gender Statistics
 
 ```{r}
 micu_patients <- icu |>
@@ -127,7 +127,31 @@ charlson_combined <- bind_rows(
   group_by(hadm_id) |>
   summarise(charlson_score = max(charlson_score), .groups = "drop")
 
-micu_analysis <- micu_local |>
+micu_cohort_final <- micu_patients_local |>
   left_join(charlson_combined, by = "hadm_id") |>
   mutate(charlson_score = replace_na(charlson_score, 0))
+```
+
+### Gender-Specific Cohort Counts and 30-Day Mortality Rates After Initial MICU Admission
+```{r}
+gender_summary <- micu_cohort_final |>
+  group_by(gender) |>
+  summarise(
+    total_patients = n(),
+    mortality_rate = mean(mortality_30_days, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  collect()
+
+male_group <- micu_cohort_final |>
+  filter(gender == "M")
+
+female_group <- micu_cohort_final |>
+  filter(gender == "F")
+
+male_summary <- gender_summary |> filter(gender == "M")
+female_summary <- gender_summary |> filter(gender == "F")
+
+print(female_summary)
+print(male_summary)
 ```
