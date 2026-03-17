@@ -391,7 +391,7 @@ top_features <- mi_scores |>
   pull(attributes)
 
 impute_rec <- recipe(mortality_30_days ~ ., data = train_data) |>
-  step_select(all_of(c("mortality_30_days", top_features))) |>
+  step_select(mortality_30_days, any_of(top_features)) |>
   # Median imputation for continuous predictors
   step_impute_median(all_numeric_predictors()) |>
   # Mode imputation for categorical predictors
@@ -495,4 +495,171 @@ gb_mod <-
   ) |>
   set_engine("xgboost")
 gb_mod
+```
+```{r}
+param_grid_logit <- grid_regular(
+  penalty(range = c(-6, 3)),
+  mixture(),
+  levels = c(30, 5)
+) |>
+  print()
+
+param_grid_rf <- grid_regular(
+  trees(range = c(100L, 500L)),
+  mtry(range = c(1L, 5L)),
+  levels = c(5, 5)
+)
+param_grid_rf
+
+param_grid_gb <- grid_regular(
+  tree_depth(range = c(1L, 3L)),
+  learn_rate(range = c(-5, 2), trans = log10_trans()),
+  levels = c(3, 10)
+)
+param_grid_gb
+
+folds <- vfold_cv(train_data, v = 5, strata = mortality_30_days)
+```
+```{r}
+logit_wf <- workflow() |>
+  add_recipe(impute_rec) |>
+  add_model(logit_mod) |>
+  print()
+
+rf_wf <- workflow() |>
+  add_recipe(impute_rec) |>
+  add_model(rf_mod)
+rf_wf
+
+gb_wf <- workflow() |>
+  add_recipe(impute_rec) |>
+  add_model(gb_mod)
+gb_wf
+```
+```{r}
+# Parallel tuning across available CPU cores
+cl <- makePSOCKcluster(parallel::detectCores() - 1)
+
+registerDoParallel(cl)
+
+(logit_fit <- logit_wf |>
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_logit,
+    metrics = metric_set(roc_auc, accuracy)
+  )) |>
+  system.time()
+
+rf_fit <- rf_wf |>
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_rf,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+gb_fit <- gb_wf |>
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_gb,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+stopCluster(cl)
+```
+
+```{r}
+logit_fit
+rf_fit
+gb_fit
+```
+```{r}
+logit_fit |>
+  collect_metrics() |>
+  print(width = Inf) |>
+  filter(.metric == "roc_auc") |>
+  ggplot(aes(x = penalty, y = mean, color = factor(mixture))) +
+  geom_point() +
+  labs(x = "Penalty", y = "Cross-Validated AUC") +
+  scale_x_log10()
+```
+
+```{r}
+rf_fit |>
+  collect_metrics() |>
+  print(width = Inf) |>
+  filter(.metric == "roc_auc") |>
+  ggplot(aes(x = trees, y = mean, color = factor(mtry))) +
+  geom_point() +
+  labs(x = "Number of Trees", y = "Cross-Validated AUC")
+```
+
+```{r}
+gb_fit |>
+  collect_metrics() |>
+  print(width = Inf) |>
+  filter(.metric == "roc_auc") |>
+  ggplot(aes(x = learn_rate, y = mean, color = factor(tree_depth))) +
+  geom_point() +
+  labs(x = "Learning Rate", y = "Cross-Validated AUC") +
+  scale_x_log10()
+```
+
+```{r}
+best_logit <- logit_fit |>
+  select_best(metric = "roc_auc")
+best_logit
+
+best_rf <- rf_fit |>
+  select_best(metric = "roc_auc")
+best_rf
+
+best_gb <- gb_fit |>
+  select_best(metric = "roc_auc")
+best_gb
+```
+
+```{r}
+final_wf_logit <- logit_wf |>
+  finalize_workflow(best_logit)
+final_wf_logit
+
+final_wf_rf <- rf_wf |>
+  finalize_workflow(best_rf)
+final_wf_rf
+
+final_wf_gb <- gb_wf |>
+  finalize_workflow(best_gb)
+final_wf_gb
+```
+```{r}
+final_fit_logit <-
+  final_wf_logit |>
+  last_fit(data_split)
+final_fit_logit
+
+final_fit_rf <-
+  final_wf_rf |>
+  last_fit(data_split)
+final_fit_rf
+
+final_fit_gb <-
+  final_wf_gb |>
+  last_fit(data_split)
+final_fit_gb
+```
+
+```{r}
+# Final performance metrics on the test set
+final_fit_logit |>
+  collect_metrics()
+
+final_fit_rf |>
+  collect_metrics()
+
+final_fit_gb |>
+  collect_metrics()
+```
+
+```{r}
+
 ```
