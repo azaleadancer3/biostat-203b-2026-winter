@@ -827,9 +827,65 @@ gb_fit_female <- gb_wf_female |>
 stopCluster(cl)
 ```
 
-### Combined Prediction Results Across Genders
 ```{r}
-# Combine prediction outputs across the full cohort and gender-specific models
+best_logit_male <- logit_fit_male |>
+  select_best(metric = "roc_auc")
+
+best_rf_male <- rf_fit_male |>
+  select_best(metric = "roc_auc")
+
+best_gb_male <- gb_fit_male |>
+  select_best(metric = "roc_auc")
+```
+
+```{r}
+best_logit_female <- logit_fit_female |>
+  select_best(metric = "roc_auc")
+
+best_rf_female <- rf_fit_female |>
+  select_best(metric = "roc_auc")
+
+best_gb_female <- gb_fit_female |>
+  select_best(metric = "roc_auc")
+```
+
+```{r}
+final_wf_logit_male <- logit_wf_male |>
+  finalize_workflow(best_logit_male)
+
+final_wf_rf_male <- rf_wf_male |>
+  finalize_workflow(best_rf_male)
+
+final_wf_gb_male <- gb_wf_male |>
+  finalize_workflow(best_gb_male)
+```
+
+```{r}
+final_wf_logit_female <- logit_wf_female |>
+  finalize_workflow(best_logit_female)
+
+final_wf_rf_female <- rf_wf_female |>
+  finalize_workflow(best_rf_female)
+
+final_wf_gb_female <- gb_wf_female |>
+  finalize_workflow(best_gb_female)
+```
+
+```{r}
+final_fit_logit_male <- final_wf_logit_male |> last_fit(split_male)
+final_fit_rf_male <- final_wf_rf_male |> last_fit(split_male)
+final_fit_gb_male <- final_wf_gb_male |> last_fit(split_male)
+```
+
+```{r}
+final_fit_logit_female <- final_wf_logit_female |> last_fit(split_female)
+final_fit_rf_female <- final_wf_rf_female |> last_fit(split_female)
+final_fit_gb_female <- final_wf_gb_female |> last_fit(split_female)
+```
+
+### Combined Model Comparison Across Genders
+```{r}
+# Merge prediction outputs from overall and gender-specific test sets
 mimic_cohort_all <- bind_rows(
   # Full cohort models
   collect_predictions(final_fit_logit) |>
