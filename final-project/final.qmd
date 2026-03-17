@@ -914,6 +914,7 @@ mimic_cohort_all <- bind_rows(
 ```
 
 # ROC Comparison Across All Genders and Female/Male Subgroup Models
+```{r}
 comparison_plot <- mimic_cohort_all |>
   group_by(model, group) |>
   roc_curve(truth = mortality_30_days, .pred_Survived) |>
@@ -932,3 +933,15 @@ comparison_plot <- mimic_cohort_all |>
   )
 
 comparison_plot
+```
+```{r}
+write_rds(mimic_cohort_all, "final_model_predictions.rds")
+```
+
+```{r}
+# close connection
+if (exists("con_bq")) {
+  dbDisconnect(con_bq)
+}
+rm(list = ls())
+```
