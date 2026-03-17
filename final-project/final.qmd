@@ -660,6 +660,170 @@ final_fit_gb |>
   collect_metrics()
 ```
 
+### Gender-Specific Predictive Models
 ```{r}
+# Separate datasets by gender and remove the gender predictor within subgroup models
+ml_data_male <- ml_data |>
+  filter(gender == "M") |>
+  select(-gender)
 
+ml_data_female <- ml_data |>
+  filter(gender == "F") |>
+  select(-gender)
 ```
+
+```{r}
+split_male <- initial_split(
+  ml_data_male,
+  prop = 0.8,
+  strata = mortality_30_days
+)
+train_male <- training(split_male)
+test_male <- testing(split_male)
+
+split_female <- initial_split(
+  ml_data_female,
+  prop = 0.8,
+  strata = mortality_30_days
+)
+train_female <- training(split_female)
+test_female <- testing(split_female)
+
+temp_recipe_m <- recipe(mortality_30_days ~ ., data = train_male) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors())
+
+train_imp_m <- bake(prep(temp_recipe_m), new_data = NULL)
+
+mi_male <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imp_m,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+top_male <- mi_male |>
+  filter(importance > 0) |>
+  pull(attributes)
+
+temp_recipe_f <- recipe(mortality_30_days ~ ., data = train_female) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors())
+
+train_imp_f <- bake(prep(temp_recipe_f), new_data = NULL)
+
+mi_female <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imp_f,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+top_female <- mi_female |>
+  filter(importance > 0) |>
+  pull(attributes)
+```
+
+```{r}
+cat("Top 5 Male Predictors:\n")
+print(head(top_male, 5))
+
+cat("\nTop 5 Female Predictors:\n")
+print(head(top_female, 5))
+```
+
+```{r}
+rec_male <- recipe(mortality_30_days ~ ., data = train_male) |>
+  step_select(mortality_30_days, any_of(top_male)) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_zv(all_numeric_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+logit_wf_male <- workflow() |>
+  add_recipe(rec_male) |>
+  add_model(logit_mod)
+
+rf_wf_male <- workflow() |>
+  add_recipe(rec_male) |>
+  add_model(rf_mod)
+
+gb_wf_male <- workflow() |>
+  add_recipe(rec_male) |>
+  add_model(gb_mod)
+
+rec_female <- recipe(mortality_30_days ~ ., data = train_female) |>
+  step_select(mortality_30_days, any_of(top_female)) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_zv(all_numeric_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+logit_wf_female <- workflow() |>
+  add_recipe(rec_female) |>
+  add_model(logit_mod)
+
+rf_wf_female <- workflow() |>
+  add_recipe(rec_female) |>
+  add_model(rf_mod)
+
+gb_wf_female <- workflow() |>
+  add_recipe(rec_female) |>
+  add_model(gb_mod)
+```
+
+```{r}
+folds_male <- vfold_cv(train_male, v = 5, strata = mortality_30_days)
+
+cl <- makePSOCKcluster(parallel::detectCores() - 1)
+registerDoParallel(cl)
+
+logit_fit_male <- logit_wf_male |>
+  tune_grid(
+    resamples = folds_male,
+    grid = param_grid_logit,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+rf_fit_male <- rf_wf_male |>
+  tune_grid(
+    resamples = folds_male,
+    grid = param_grid_rf,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+gb_fit_male <- gb_wf_male |>
+  tune_grid(
+    resamples = folds_male,
+    grid = param_grid_gb,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+folds_female <- vfold_cv(train_female, v = 5, strata = mortality_30_days)
+
+logit_fit_female <- logit_wf_female |>
+  tune_grid(
+    resamples = folds_female,
+    grid = param_grid_logit,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+rf_fit_female <- rf_wf_female |>
+  tune_grid(
+    resamples = folds_female,
+    grid = param_grid_rf,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+gb_fit_female <- gb_wf_female |>
+  tune_grid(
+    resamples = folds_female,
+    grid = param_grid_gb,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+stopCluster(cl)
+```
+
