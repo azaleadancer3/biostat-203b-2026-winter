@@ -827,3 +827,32 @@ gb_fit_female <- gb_wf_female |>
 stopCluster(cl)
 ```
 
+### Combined Prediction Results Across Genders
+```{r}
+# Combine prediction outputs across the full cohort and gender-specific models
+mimic_cohort_all <- bind_rows(
+  # Full cohort models
+  collect_predictions(final_fit_logit) |>
+    mutate(model = "Logistic Regression", group = "All"),
+  collect_predictions(final_fit_rf) |>
+    mutate(model = "Random Forest", group = "All"),
+  collect_predictions(final_fit_gb) |>
+    mutate(model = "XGBoost", group = "All"),
+
+  # Male subgroup models
+  collect_predictions(final_fit_logit_male) |>
+    mutate(model = "Logistic Regression", group = "Male"),
+  collect_predictions(final_fit_rf_male) |>
+    mutate(model = "Random Forest", group = "Male"),
+  collect_predictions(final_fit_gb_male) |>
+    mutate(model = "XGBoost", group = "Male"),
+
+  # Female subgroup models
+  collect_predictions(final_fit_logit_female) |>
+    mutate(model = "Logistic Regression", group = "Female"),
+  collect_predictions(final_fit_rf_female) |>
+    mutate(model = "Random Forest", group = "Female"),
+  collect_predictions(final_fit_gb_female) |>
+    mutate(model = "XGBoost", group = "Female")
+)
+```
