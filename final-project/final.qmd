@@ -912,3 +912,23 @@ mimic_cohort_all <- bind_rows(
     mutate(model = "XGBoost", group = "Female")
 )
 ```
+
+# ROC Comparison Across All Genders and Female/Male Subgroup Models
+comparison_plot <- mimic_cohort_all |>
+  group_by(model, group) |>
+  roc_curve(truth = mortality_30_days, .pred_Survived) |>
+  autoplot() +
+  facet_wrap(~model) +
+  labs(
+    title = "Overall vs Gender-Specific Model Performance",
+    subtitle = "ROC curves for 30-day mortality after first MICU admission",
+    color = "Patient Cohort"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    text = element_text(size = 10),
+    plot.title = element_text(face = "bold")
+  )
+
+comparison_plot
