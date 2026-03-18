@@ -27,3 +27,4 @@ display_vars <- names(micu_data)[!names(micu_data) %in% c(
   "hadm_id",
   "stay_id"
 )]
+
