@@ -1,0 +1,947 @@
+---
+title: "Biostats 203B: Final Project"
+subtitle: "Predictors and 30-Day All-Cause Mortality Post MICU Hospitalization \nby Gender Using MIMIC-IV"
+author: "Azalea Morris, UID: 505619664"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: false
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+---
+
+
+### Packages
+```{r setup}
+library(arrow)
+library(gtsummary)
+library(R.utils)
+library(tidyverse)
+library(comorbidity)
+library(grDevices)
+library(tidymodels)
+library(FSelectorRcpp)
+library(bigrquery)
+library(GGally)
+library(ranger)
+library(xgboost)
+library(glmnet)
+library(doParallel)
+library(finetune)
+library(ggplot2)
+```
+
+### Token Set up and DB connection
+```{r}
+# path to the service account token
+satoken <- "biostat-203b-2026-winter-92fefbfab477.json"
+# BigQuery authentication using service account
+bq_auth(path = satoken, cache = FALSE)
+
+con_bq <- dbConnect(
+  bigrquery::bigquery(),
+  project = "biostat-203b-2025-winter",
+  dataset = "mimiciv_3_1",
+  billing = "biostat-203b-2025-winter"
+)
+con_bq
+```
+
+```{r}
+# load BigQuery tables
+icu <- tbl(con_bq, "icustays")
+patients <- tbl(con_bq, "patients")
+diagnosis <- tbl(con_bq, "diagnoses_icd")
+d_diagnosis <- tbl(con_bq, "d_icd_diagnoses")
+```
+
+### Cohort and Charlson Comorbidity Creation with Gender Statistics
+```{r}
+micu_patients <- icu |>
+  filter(first_careunit == "Medical Intensive Care Unit (MICU)") |>
+  group_by(subject_id) |>
+  slice_min(order_by = intime, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  inner_join(patients, by = "subject_id") |>
+  filter(
+    anchor_age >= 18, # Restrict analysis to adult patients
+    !is.na(anchor_age), # Remove records with missing age
+    !is.na(gender) # Remove records with missing gender
+  ) |>
+  mutate(
+    days_death = sql("DATE_DIFF(CAST(dod AS DATE), CAST(intime AS DATE), DAY)"),
+    mortality_30_days = ifelse(!is.na(dod) & days_death <= 30, 1, 0)
+  )
+
+micu_patients_local <- micu_patients |> collect()
+
+diagnosis_subset <- diagnosis |>
+  semi_join(micu_patients, by = "hadm_id") |>
+  select(hadm_id, icd_code, icd_version) |>
+  collect()
+```
+
+```{r}
+icd9_subset <- diagnosis_subset |> filter(icd_version == 9)
+icd10_subset <- diagnosis_subset |> filter(icd_version == 10)
+
+cci_icd9 <- comorbidity(
+  x = icd9_subset,
+  id = "hadm_id",
+  code = "icd_code",
+  map = "charlson_icd9_quan",
+  assign0 = FALSE
+)
+
+cci_icd10 <- comorbidity(
+  x = icd10_subset,
+  id = "hadm_id",
+  code = "icd_code",
+  map = "charlson_icd10_quan",
+  assign0 = FALSE
+)
+
+cci_icd9$charlson_score <- score(
+  cci_icd9,
+  weights = "quan",
+  assign0 = FALSE
+)
+
+cci_icd10$charlson_score <- score(
+  cci_icd10,
+  weights = "quan",
+  assign0 = FALSE
+)
+
+# Merge ICD-9 and ICD-10 Charlson scores, keeping the highest per admission
+charlson_combined <- bind_rows(
+  cci_icd9 |> select(hadm_id, charlson_score),
+  cci_icd10 |> select(hadm_id, charlson_score)
+) |>
+  group_by(hadm_id) |>
+  summarise(charlson_score = max(charlson_score), .groups = "drop")
+
+micu_cohort_final <- micu_patients_local |>
+  left_join(charlson_combined, by = "hadm_id") |>
+  mutate(charlson_score = replace_na(charlson_score, 0))
+```
+
+### Gender-Specific Cohort Counts and 30-Day Mortality Rates After Initial MICU Admission
+```{r}
+gender_summary <- micu_cohort_final |>
+  group_by(gender) |>
+  summarise(
+    total_patients = n(),
+    mortality_rate = mean(mortality_30_days, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  collect()
+
+male_group <- micu_cohort_final |>
+  filter(gender == "M")
+
+female_group <- micu_cohort_final |>
+  filter(gender == "F")
+
+male_summary <- gender_summary |> filter(gender == "M")
+female_summary <- gender_summary |> filter(gender == "F")
+
+print(female_summary)
+print(male_summary)
+```
+### Vital Sign Feature Extraction
+```{r}
+# Pull first-24-hour vital signs recorded during the initial MICU stay
+vital_codes <- c(
+  220045, # Heart rate
+  220210, # Respiratory rate
+  220277, # SpO2
+  223761, # Temperature Fahrenheit
+  220052, # Mean arterial pressure
+  220179, # Non-invasive systolic BP
+  220180, # Non-invasive diastolic BP
+  220181, # Non-invasive mean BP
+  226512 # Admission weight (kg)
+)
+
+vital_data_query <- tbl(con_bq, "chartevents") |>
+  filter(itemid %in% vital_codes) |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  filter(charttime >= intime) |>
+  filter(charttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  mutate(
+    vital_name = case_when(
+      itemid == 220045 ~ "HR",
+      itemid == 220210 ~ "RR",
+      itemid == 220277 ~ "SpO2",
+      itemid == 223761 ~ "Temp_F",
+      itemid == 220052 ~ "Arterial_BP_Mean",
+      itemid == 220179 ~ "NIBP_Systolic",
+      itemid == 220180 ~ "NIBP_Diastolic",
+      itemid == 220181 ~ "NIBP_Mean",
+      itemid == 226512 ~ "Weight_kg"
+    )
+  ) |>
+  group_by(stay_id, vital_name) |>
+  summarise(
+    mean_value = mean(valuenum, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+vital_data_local <- vital_data_query |>
+  collect() |>
+  pivot_wider(
+    names_from = vital_name,
+    values_from = mean_value,
+    names_glue = "{vital_name}_{.value}"
+  )
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(vital_data_local, by = "stay_id")
+```
+
+### Laboratory Values Feature Extraction
+```{r}
+# Extract first-24-hour laboratory values from the initial MICU admission
+lab_codes <- c(
+  50813, # Lactate
+  50912, # Creatinine
+  51300, # WBC Count
+  50809, # Glucose
+  50983, # Sodium
+  50971, # Potassium
+  50902, # Chloride
+  50882, # Bicarbonate
+  51006, # Blood Urea Nitrogen
+  51222, # Hemoglobin
+  51221, # Hematocrit
+  51265 # Platelets
+)
+
+lab_data_query <- tbl(con_bq, "labevents") |>
+  filter(itemid %in% lab_codes) |>
+  inner_join(
+    micu_patients |> select(subject_id, hadm_id, stay_id, intime),
+    by = c("subject_id", "hadm_id")
+  ) |>
+  filter(charttime >= intime) |>
+  filter(charttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  mutate(
+    lab_name = case_when(
+      itemid == 50813 ~ "Lactate",
+      itemid == 50912 ~ "Creatinine",
+      itemid == 51300 ~ "WBC_Count",
+      itemid == 50809 ~ "Glucose",
+      itemid == 50983 ~ "Sodium",
+      itemid == 50971 ~ "Potassium",
+      itemid == 50902 ~ "Chloride",
+      itemid == 50882 ~ "Bicarbonate",
+      itemid == 51006 ~ "BUN",
+      itemid == 51222 ~ "Hemoglobin",
+      itemid == 51221 ~ "Hematocrit",
+      itemid == 51265 ~ "Platelets"
+    )
+  ) |>
+  group_by(stay_id, lab_name) |>
+  summarise(
+    mean_value = mean(valuenum, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+lab_data_local <- lab_data_query |>
+  collect() |>
+  pivot_wider(
+    names_from = lab_name,
+    values_from = mean_value,
+    names_glue = "{lab_name}_{.value}"
+  )
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(lab_data_local, by = "stay_id")
+```
+
+### Vasopressor Use and Intubation Features Extraction
+```{r}
+vasopressor_codes <- c(
+  221906, # Norepinephrine
+  221289, # Epinephrine
+  221749, # Phenylephrine
+  222315, # Vasopressin
+  221662 # Dopamine
+)
+
+intubation_codes <- c(
+  224385 # Intubation
+)
+
+input_events <- tbl(con_bq, "inputevents")
+procedure_events <- tbl(con_bq, "procedureevents")
+
+vasopressor_query <- input_events |>
+  filter(itemid %in% vasopressor_codes) |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  # Restrict medications to the first 24 hours after ICU admission
+  filter(starttime >= intime) |>
+  filter(starttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  group_by(stay_id) |>
+  summarise(vaso_active = 1, .groups = "drop")
+
+intubation_data_query <- procedure_events |>
+  filter(itemid %in% intubation_codes) |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  # Restrict procedures to the first 24 hours after ICU admission
+  filter(starttime >= intime) |>
+  filter(starttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  group_by(stay_id) |>
+  summarise(intubated = 1, .groups = "drop")
+
+vasopressor_local <- vasopressor_query |> collect()
+intubation_local <- intubation_data_query |> collect()
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(vasopressor_local, by = "stay_id") |>
+  left_join(intubation_local, by = "stay_id") |>
+  mutate(
+    vaso_active = replace_na(vaso_active, 0),
+    intubated = replace_na(intubated, 0)
+  )
+```
+### Urine Output Feature Extraction
+```{r}
+urine_query <- tbl(con_bq, "outputevents") |>
+  inner_join(
+    micu_patients |> select(stay_id, intime),
+    by = "stay_id"
+  ) |>
+  filter(charttime >= intime) |>
+  filter(charttime <= sql("DATETIME_ADD(intime, INTERVAL 24 HOUR)")) |>
+  group_by(stay_id) |>
+  summarise(urine_output_24h = sum(value, na.rm = TRUE), .groups = "drop")
+
+urine_local <- urine_query |> collect()
+
+micu_cohort_final <- micu_cohort_final |>
+  left_join(urine_local, by = "stay_id") |>
+  # Assume zero if no urine output was recorded
+  mutate(urine_output_24h = replace_na(urine_output_24h, 0))
+```
+
+```{r}
+glimpse(micu_cohort_final)
+write_rds(micu_cohort_final, "mimic_cohort_final.rds")
+```
+
+### Missing Data Imputation and Feature Preparation
+```{r}
+# Prepare modeling dataset and handle missing values
+# Median imputation is applied to numeric predictors and mode imputation to factors
+ml_data <- micu_cohort_final |>
+  # Remove identifiers and variables not used for prediction
+  select(
+    -subject_id, -hadm_id, -stay_id,
+    -intime, -outtime, -dod, -days_death,
+    -los, -first_careunit, -last_careunit
+  ) |>
+  mutate(
+    mortality_30_days = factor(
+      mortality_30_days,
+      levels = c(0, 1),
+      labels = c("Survived", "Died")
+    ),
+    gender = as.factor(gender)
+  )
+
+set.seed(123) # Ensure reproducible train/test split
+data_split <- initial_split(
+  ml_data,
+  prop = 0.8,
+  strata = mortality_30_days
+)
+
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+temp_recipe <- recipe(mortality_30_days ~ ., data = train_data) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors())
+
+train_imputed_mi <- bake(prep(temp_recipe), new_data = NULL)
+
+mi_scores <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imputed_mi,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+top_features <- mi_scores |>
+  filter(importance > 0) |>
+  pull(attributes)
+
+impute_rec <- recipe(mortality_30_days ~ ., data = train_data) |>
+  step_select(mortality_30_days, any_of(top_features)) |>
+  # Median imputation for continuous predictors
+  step_impute_median(all_numeric_predictors()) |>
+  # Mode imputation for categorical predictors
+  step_impute_mode(all_nominal_predictors()) |>
+  # Convert categorical predictors into dummy variables
+  step_dummy(all_nominal_predictors()) |>
+  # Remove predictors with zero variance
+  step_zv(all_numeric_predictors()) |>
+  # Standardize numeric predictors
+  step_normalize(all_numeric_predictors())
+
+impute_prep <- prep(impute_rec)
+
+train_imputed <- bake(impute_prep, new_data = NULL)
+test_imputed <- bake(impute_prep, new_data = test_data)
+```
+
+### Cohort Summary Table 1 Stratified by Gender
+```{r}
+median_value <- stats::median
+q25 <- function(x) stats::quantile(x, probs = 0.25, na.rm = TRUE)
+q75 <- function(x) stats::quantile(x, probs = 0.75, na.rm = TRUE)
+
+summary_table_gender <- ml_data |>
+  tbl_summary(
+    by = gender,
+    statistic = list(
+      all_continuous() ~ "{median} ({q25}, {q75})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    missing_text = "Missing"
+  ) |>
+  add_overall() |>
+  add_p() |>
+  modify_spanning_header(c("stat_1", "stat_2") ~ "**Gender**") |>
+  modify_header(label = "**Clinical Characteristics**") |>
+  bold_labels()
+
+summary_table_gender
+```
+### Mutual Information Scores Ranking of Predictive Features
+```{r}
+# Recalculate mutual information after preprocessing
+# Higher values indicate stronger contribution to mortality prediction
+mi_scores <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imputed,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+# Plot the top 20 ranked predictors
+feature_importance_plot <- mi_scores |>
+  slice_head(n = 20) |>
+  ggplot(aes(x = reorder(attributes, importance), y = importance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Predictors by Mutual Information",
+    subtitle = "30-Day Mortality Prediction in MICU Patients",
+    x = "Predictor",
+    y = "Information Gain"
+  ) +
+  theme_minimal()
+
+# feature_importance_plot
+
+# Display ranked feature table
+head(mi_scores, max(nrow(mi_scores)))
+```
+
+### Predictive Models for the Full Cohort
+```{r}
+# Logistic regression model with elastic net tuning
+logit_mod <- logistic_reg(
+  penalty = tune(),
+  mixture = tune()
+) |>
+  set_engine("glmnet", standardize = FALSE) |>
+  print()
+
+# Random forest model
+rf_mod <-
+  rand_forest(
+    mode = "classification",
+    # Number of predictors sampled at each split
+    mtry = tune(),
+    # Number of trees included in the ensemble
+    trees = tune()
+  ) |>
+  set_engine("ranger")
+rf_mod
+
+# Gradient boosting model (XGBoost)
+gb_mod <-
+  boost_tree(
+    mode = "classification",
+    trees = 300,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_engine("xgboost")
+gb_mod
+```
+```{r}
+param_grid_logit <- grid_regular(
+  penalty(range = c(-6, 3)),
+  mixture(),
+  levels = c(30, 5)
+) |>
+  print()
+
+param_grid_rf <- grid_regular(
+  trees(range = c(100L, 500L)),
+  mtry(range = c(1L, 5L)),
+  levels = c(5, 5)
+)
+param_grid_rf
+
+param_grid_gb <- grid_regular(
+  tree_depth(range = c(1L, 3L)),
+  learn_rate(range = c(-5, 2), trans = log10_trans()),
+  levels = c(3, 10)
+)
+param_grid_gb
+
+folds <- vfold_cv(train_data, v = 5, strata = mortality_30_days)
+```
+```{r}
+logit_wf <- workflow() |>
+  add_recipe(impute_rec) |>
+  add_model(logit_mod) |>
+  print()
+
+rf_wf <- workflow() |>
+  add_recipe(impute_rec) |>
+  add_model(rf_mod)
+rf_wf
+
+gb_wf <- workflow() |>
+  add_recipe(impute_rec) |>
+  add_model(gb_mod)
+gb_wf
+```
+```{r}
+# Parallel tuning across available CPU cores
+cl <- makePSOCKcluster(parallel::detectCores() - 1)
+
+registerDoParallel(cl)
+
+(logit_fit <- logit_wf |>
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_logit,
+    metrics = metric_set(roc_auc, accuracy)
+  )) |>
+  system.time()
+
+rf_fit <- rf_wf |>
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_rf,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+gb_fit <- gb_wf |>
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_gb,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+stopCluster(cl)
+```
+
+```{r}
+logit_fit
+rf_fit
+gb_fit
+```
+```{r}
+logit_fit |>
+  collect_metrics() |>
+  print(width = Inf) |>
+  filter(.metric == "roc_auc") |>
+  ggplot(aes(x = penalty, y = mean, color = factor(mixture))) +
+  geom_point() +
+  labs(x = "Penalty", y = "Cross-Validated AUC") +
+  scale_x_log10()
+```
+
+```{r}
+rf_fit |>
+  collect_metrics() |>
+  print(width = Inf) |>
+  filter(.metric == "roc_auc") |>
+  ggplot(aes(x = trees, y = mean, color = factor(mtry))) +
+  geom_point() +
+  labs(x = "Number of Trees", y = "Cross-Validated AUC")
+```
+
+```{r}
+gb_fit |>
+  collect_metrics() |>
+  print(width = Inf) |>
+  filter(.metric == "roc_auc") |>
+  ggplot(aes(x = learn_rate, y = mean, color = factor(tree_depth))) +
+  geom_point() +
+  labs(x = "Learning Rate", y = "Cross-Validated AUC") +
+  scale_x_log10()
+```
+
+```{r}
+best_logit <- logit_fit |>
+  select_best(metric = "roc_auc")
+best_logit
+
+best_rf <- rf_fit |>
+  select_best(metric = "roc_auc")
+best_rf
+
+best_gb <- gb_fit |>
+  select_best(metric = "roc_auc")
+best_gb
+```
+
+```{r}
+final_wf_logit <- logit_wf |>
+  finalize_workflow(best_logit)
+final_wf_logit
+
+final_wf_rf <- rf_wf |>
+  finalize_workflow(best_rf)
+final_wf_rf
+
+final_wf_gb <- gb_wf |>
+  finalize_workflow(best_gb)
+final_wf_gb
+```
+```{r}
+final_fit_logit <-
+  final_wf_logit |>
+  last_fit(data_split)
+final_fit_logit
+
+final_fit_rf <-
+  final_wf_rf |>
+  last_fit(data_split)
+final_fit_rf
+
+final_fit_gb <-
+  final_wf_gb |>
+  last_fit(data_split)
+final_fit_gb
+```
+
+```{r}
+# Final performance metrics on the test set
+final_fit_logit |>
+  collect_metrics()
+
+final_fit_rf |>
+  collect_metrics()
+
+final_fit_gb |>
+  collect_metrics()
+```
+
+### Gender-Specific Predictive Models
+```{r}
+# Separate datasets by gender and remove the gender predictor within subgroup models
+ml_data_male <- ml_data |>
+  filter(gender == "M") |>
+  select(-gender)
+
+ml_data_female <- ml_data |>
+  filter(gender == "F") |>
+  select(-gender)
+```
+
+```{r}
+split_male <- initial_split(
+  ml_data_male,
+  prop = 0.8,
+  strata = mortality_30_days
+)
+train_male <- training(split_male)
+test_male <- testing(split_male)
+
+split_female <- initial_split(
+  ml_data_female,
+  prop = 0.8,
+  strata = mortality_30_days
+)
+train_female <- training(split_female)
+test_female <- testing(split_female)
+
+temp_recipe_m <- recipe(mortality_30_days ~ ., data = train_male) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors())
+
+train_imp_m <- bake(prep(temp_recipe_m), new_data = NULL)
+
+mi_male <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imp_m,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+top_male <- mi_male |>
+  filter(importance > 0) |>
+  pull(attributes)
+
+temp_recipe_f <- recipe(mortality_30_days ~ ., data = train_female) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors())
+
+train_imp_f <- bake(prep(temp_recipe_f), new_data = NULL)
+
+mi_female <- information_gain(
+  mortality_30_days ~ .,
+  data = train_imp_f,
+  type = "infogain"
+) |>
+  arrange(desc(importance))
+
+top_female <- mi_female |>
+  filter(importance > 0) |>
+  pull(attributes)
+```
+
+```{r}
+cat("Top 5 Male Predictors:\n")
+print(head(top_male, 5))
+
+cat("\nTop 5 Female Predictors:\n")
+print(head(top_female, 5))
+```
+
+```{r}
+rec_male <- recipe(mortality_30_days ~ ., data = train_male) |>
+  step_select(mortality_30_days, any_of(top_male)) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_zv(all_numeric_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+logit_wf_male <- workflow() |>
+  add_recipe(rec_male) |>
+  add_model(logit_mod)
+
+rf_wf_male <- workflow() |>
+  add_recipe(rec_male) |>
+  add_model(rf_mod)
+
+gb_wf_male <- workflow() |>
+  add_recipe(rec_male) |>
+  add_model(gb_mod)
+
+rec_female <- recipe(mortality_30_days ~ ., data = train_female) |>
+  step_select(mortality_30_days, any_of(top_female)) |>
+  step_impute_median(all_numeric_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_zv(all_numeric_predictors()) |>
+  step_normalize(all_numeric_predictors())
+
+logit_wf_female <- workflow() |>
+  add_recipe(rec_female) |>
+  add_model(logit_mod)
+
+rf_wf_female <- workflow() |>
+  add_recipe(rec_female) |>
+  add_model(rf_mod)
+
+gb_wf_female <- workflow() |>
+  add_recipe(rec_female) |>
+  add_model(gb_mod)
+```
+
+```{r}
+folds_male <- vfold_cv(train_male, v = 5, strata = mortality_30_days)
+
+cl <- makePSOCKcluster(parallel::detectCores() - 1)
+registerDoParallel(cl)
+
+logit_fit_male <- logit_wf_male |>
+  tune_grid(
+    resamples = folds_male,
+    grid = param_grid_logit,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+rf_fit_male <- rf_wf_male |>
+  tune_grid(
+    resamples = folds_male,
+    grid = param_grid_rf,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+gb_fit_male <- gb_wf_male |>
+  tune_grid(
+    resamples = folds_male,
+    grid = param_grid_gb,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+folds_female <- vfold_cv(train_female, v = 5, strata = mortality_30_days)
+
+logit_fit_female <- logit_wf_female |>
+  tune_grid(
+    resamples = folds_female,
+    grid = param_grid_logit,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+rf_fit_female <- rf_wf_female |>
+  tune_grid(
+    resamples = folds_female,
+    grid = param_grid_rf,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+gb_fit_female <- gb_wf_female |>
+  tune_grid(
+    resamples = folds_female,
+    grid = param_grid_gb,
+    metrics = metric_set(roc_auc, accuracy)
+  )
+
+stopCluster(cl)
+```
+
+```{r}
+best_logit_male <- logit_fit_male |>
+  select_best(metric = "roc_auc")
+
+best_rf_male <- rf_fit_male |>
+  select_best(metric = "roc_auc")
+
+best_gb_male <- gb_fit_male |>
+  select_best(metric = "roc_auc")
+```
+
+```{r}
+best_logit_female <- logit_fit_female |>
+  select_best(metric = "roc_auc")
+
+best_rf_female <- rf_fit_female |>
+  select_best(metric = "roc_auc")
+
+best_gb_female <- gb_fit_female |>
+  select_best(metric = "roc_auc")
+```
+
+```{r}
+final_wf_logit_male <- logit_wf_male |>
+  finalize_workflow(best_logit_male)
+
+final_wf_rf_male <- rf_wf_male |>
+  finalize_workflow(best_rf_male)
+
+final_wf_gb_male <- gb_wf_male |>
+  finalize_workflow(best_gb_male)
+```
+
+```{r}
+final_wf_logit_female <- logit_wf_female |>
+  finalize_workflow(best_logit_female)
+
+final_wf_rf_female <- rf_wf_female |>
+  finalize_workflow(best_rf_female)
+
+final_wf_gb_female <- gb_wf_female |>
+  finalize_workflow(best_gb_female)
+```
+
+```{r}
+final_fit_logit_male <- final_wf_logit_male |> last_fit(split_male)
+final_fit_rf_male <- final_wf_rf_male |> last_fit(split_male)
+final_fit_gb_male <- final_wf_gb_male |> last_fit(split_male)
+```
+
+```{r}
+final_fit_logit_female <- final_wf_logit_female |> last_fit(split_female)
+final_fit_rf_female <- final_wf_rf_female |> last_fit(split_female)
+final_fit_gb_female <- final_wf_gb_female |> last_fit(split_female)
+```
+
+### Combined Model Comparison Across Genders
+```{r}
+# Merge prediction outputs from overall and gender-specific test sets
+mimic_cohort_all <- bind_rows(
+  # Full cohort models
+  collect_predictions(final_fit_logit) |>
+    mutate(model = "Logistic Regression", group = "All"),
+  collect_predictions(final_fit_rf) |>
+    mutate(model = "Random Forest", group = "All"),
+  collect_predictions(final_fit_gb) |>
+    mutate(model = "XGBoost", group = "All"),
+
+  # Male subgroup models
+  collect_predictions(final_fit_logit_male) |>
+    mutate(model = "Logistic Regression", group = "Male"),
+  collect_predictions(final_fit_rf_male) |>
+    mutate(model = "Random Forest", group = "Male"),
+  collect_predictions(final_fit_gb_male) |>
+    mutate(model = "XGBoost", group = "Male"),
+
+  # Female subgroup models
+  collect_predictions(final_fit_logit_female) |>
+    mutate(model = "Logistic Regression", group = "Female"),
+  collect_predictions(final_fit_rf_female) |>
+    mutate(model = "Random Forest", group = "Female"),
+  collect_predictions(final_fit_gb_female) |>
+    mutate(model = "XGBoost", group = "Female")
+)
+```
+
+# ROC Comparison Across All Genders and Female/Male Subgroup Models
+```{r}
+comparison_plot <- mimic_cohort_all |>
+  group_by(model, group) |>
+  roc_curve(truth = mortality_30_days, .pred_Survived) |>
+  autoplot() +
+  facet_wrap(~model) +
+  labs(
+    title = "Overall vs Gender-Specific Model Performance",
+    subtitle = "ROC curves for 30-day mortality after first MICU admission",
+    color = "Patient Cohort"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    text = element_text(size = 10),
+    plot.title = element_text(face = "bold")
+  )
+
+comparison_plot
+```
+```{r}
+write_rds(mimic_cohort_all, "final_model_predictions.rds")
+```
+
+```{r}
+# close connection
+if (exists("con_bq")) {
+  dbDisconnect(con_bq)
+}
+rm(list = ls())
+```
