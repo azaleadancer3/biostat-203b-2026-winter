@@ -15,17 +15,14 @@ format:
 
 # Abstract
 
-Provide a succinct summary of your entire project (~250–300 words), including:
+Thirty-day mortality after medical intensive care unit (MICU) admission remains an important outcome in critical care because it reflects both acute illness severity and early post-discharge risk. Identifying patients at elevated short-term mortality risk may support earlier intervention, discharge planning, and more targeted follow-up after critical illness. In addition, prior work suggests that biologic sex and gender may influence ICU outcomes, although most prediction studies include sex only as an adjustment variable rather than examining subgroup-specific prediction patterns.
 
-Background - Context and why the problem matters
+The objective of this project was to identify early predictors of 30-day all-cause mortality after first MICU admission using the MIMIC-IV database and to compare model performance in pooled and gender-specific cohorts. Adult MICU patients were identified using cloud-based queries through Google BigQuery, with only first ICU admissions retained. Demographic variables, Charlson comorbidity score, first 24-hour laboratory values, vital signs, and intervention indicators such as vasopressor use, intubation, and urine output were included. Missing values were handled using median or mode imputation, and feature ranking was performed using mutual information scores.
 
-Objectives – What your project intends to investigate
+Three machine learning models were trained and evaluated: penalized logistic regression, random forest, and XGBoost. Model development used an 80/20 train-test split with 5-fold cross-validation on the training data. Performance was primarily assessed using ROC-AUC, and ROC curves were compared across pooled, male, and female cohorts.
 
-Methods - Main approach and data sources
+Across models, XGBoost showed the strongest discrimination, while logistic regression remained a useful interpretable baseline. Important predictors included lactate, creatinine, blood urea nitrogen, vasopressor exposure, and urine output. Gender-specific models showed similar overall discrimination but some differences in feature ranking. These findings suggest that early MICU clinical data can support short-term mortality prediction and that subgroup analyses may provide additional insight for future ICU risk modeling.
 
-Results - Key findings
-
-Conclusion - Implications and potential impact
 
 # Introduction
 
